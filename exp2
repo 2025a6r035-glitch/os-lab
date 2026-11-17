@@ -1,0 +1,503 @@
+Shell Redirection & the sed Stream Editor
+Combined Date and User Redirection
+To display the current date on the screen while simultaneously redirecting the list of logged-in users to a file, use the semicolon ; or logical AND && operator in a single line:
+Command:
+date; who > logged_users.txt
+Explanation:
+date: Prints the current system date and time to the standard output (your screen).
+;: Separates the two commands so they run sequentially.
+who: Lists the users currently logged in.
+> logged_users.txt: Redirects the output of the who command into a file named logged_users.txt.
+Note: Ho sakta hai ki 'who' command har environment mein available ya reliable na ho, kyunki yeh system ki configuration par depend karta hai. Iske alternative mein aap 'w' ya 'whoami' command ka use kar sakte hain.
+Basic sed Commands
+A Conceptual, Classroom-Friendly Guide to the Stream Editor
+1. What is sed?
+sed stands for Stream Editor.
+It is a Linux command-line utility used to read and transform text. It can perform operations such as:
+Printing selected lines
+Deleting lines
+Searching for text
+Replacing text
+Modifying text using patterns
+Performing automatic text transformations
+Unlike a text editor such as nano, sed normally does not open the file for interactive editing. Instead, it reads the input, applies the specified operation, and produces the resulting output.
+Printing Text Using sed
+2. How to Display the Contents of a File Using sed?
+Command
+sed -n 'p' Names.txt
+Explanation
+The command is made up of three parts:
+sed     -n     'p'     Names.txt
+|        |       |          |
+|        |       |          +-- File to process
+|        |       +------------- Print command
+|        +--------------------- Suppress automatic printing
++------------------------------ Stream editor
+sed
+Starts the Stream Editor.
+-n
+Normally, sed automatically prints every line after processing it.
+The -n option means:
+Do not print lines automatically.
+This allows us to control exactly which lines are printed.
+p
+p means print.
+Because -n has disabled automatic printing, the p command tells sed which lines we specifically want to display.
+Names.txt
+This is the input file.
+Important
+-n -> suppress automatic output
+p  -> explicitly print
+Therefore:
+sed -n 'p' Names.txt
+prints every line exactly once.
+3. How to Display a Specific Line?
+Command
+sed -n '2p' Names.txt
+This prints only line number 2.
+Suppose Names.txt contains:
+John Doe
+Alice Smith
+Rahul Sharma
+Aniket Singh
+Output:
+Alice Smith
+Explanation
+2p
+| |
+| +-- print
++---- line number 2
+So:
+2p -> print line 2
+The -n option is important because it prevents the other lines from being printed automatically.
+4. How to Display a Range of Lines?
+Command
+sed -n '2,4p' Names.txt
+This prints lines 2 through 4.
+Output:
+Alice Smith
+Rahul Sharma
+Aniket Singh
+Explanation
+2,4p
+| | |
+| | +-- print
+| +---- ending line
++------ starting line
+Therefore:
+2,4p -> print lines 2 to 4
+Deleting Lines Using sed
+5. How to Delete a Specific Line?
+Command
+sed '2d' Names.txt
+This removes line 2 from the output produced by sed.
+Explanation
+2d
+| |
+| +-- delete
++---- line 2
+d means delete.
+If the file contains:
+John Doe
+Alice Smith
+Rahul Sharma
+Aniket Singh
+the output becomes:
+John Doe
+Rahul Sharma
+Aniket Singh
+Important
+This command does not permanently remove line 2 from Names.txt.
+It only removes the line from the output.
+To modify the original file, -i must be used:
+sed -i '2d' Names.txt
+6. How to Delete the First and Last Line?
+Command
+sed '1d' Names.txt
+sed '$d' Names.txt
+This means:
+1 -> line number 1
+d -> delete
+Therefore:
+1d -> delete line 1
+The remaining lines are displayed.
+Substituting Text
+7. How to Replace a Word Using sed?
+Command
+sed 's/John/Amit/' Names.txt
+Suppose the file contains:
+John Doe
+Alice Smith
+Rahul Sharma
+Output:
+Amit Doe
+Alice Smith
+Rahul Sharma
+Explanation
+The general syntax is:
+s/old_text/new_text/
+For our command:
+s/John/Amit/
+| |    |
+| |    +-- replacement
+| +------- text to search
++--------- substitute
+Therefore:
+s -> substitute
+John -> search for this text for the first occurence
+Amit -> replace it with this text
+8. What Happens When the Same Word Appears Multiple Times?
+Suppose:
+John Doe
+John Smith
+Rahul John
+Run:
+sed 's/John/Amit/' Names.txt
+Output:
+Amit Doe
+Amit Smith
+Rahul John
+By default, sed replaces only the first occurrence on each line.
+9. How to Replace All Occurrences in a Line?
+Use the g flag.
+Command
+sed 's/John/Amit/g' Names.txt
+Output:
+Amit Doe
+Amit Smith
+Rahul Amit
+Explanation
+g -> global
+It tells sed:
+Continue replacing matches instead of stopping after the first match on each line.
+Compare:
+sed 's/John/Amit/' Names.txt
+-> first occurrence on each line.
+sed 's/John/Amit/g' Names.txt
+-> all occurrences on each line.
+Editing the Original File
+10. How to Permanently Apply the Changes?
+Normally:
+sed 's/John/Amit/g' Names.txt
+only displays the modified result. The original file remains unchanged.
+To modify the actual file, use:
+sed -i 's/John/Amit/g' Names.txt
+Explanation
+-i -> in-place editing
+It tells sed to write the changes back into the original file.
+Difference
+Command
+Effect
+sed 's/John/Amit/g' Names.txt
+Changes only the output.
+sed -i 's/John/Amit/g' Names.txt
+Changes the actual file.
+
+
+11. How to Create a Backup Before Editing?
+Command
+sed -i.bak 's/John/Amit/g' Names.txt
+This performs the replacement and creates:
+Names.txt
+Names.txt.bak
+The .bak file contains the original version.
+This is useful when testing commands because you have a backup if something goes wrong.
+Using Special Characters
+12. How to Match Text at the Beginning/End of a Line?
+Use:
+^
+Command
+sed 's/^John/Amit/' Names.txt
+Suppose:
+John Doe
+My friend John
+John Smith
+Output:
+Amit Doe
+My friend John
+Amit Smith
+Explanation
+^ -> beginning of the line
+Therefore:
+^John
+means:
+Match John only when it occurs at the beginning of a line.
+“My friend John” is not changed because John is not at the beginning.
+13. How to Match Text at the End of a Line?
+Use:
+$
+Command
+sed 's/John$/Amit/' Names.txt
+Suppose:
+John Doe
+My friend John
+John Smith
+Output:
+John Doe
+My friend Amit
+John Smith
+Explanation
+$ -> end of the line
+Therefore:
+John$
+means:
+Match John only when it occurs at the end of a line.
+Working with Spaces
+14. How to Replace All Spaces with _?
+Command
+sed 's/ /_/g' Names.txt
+Suppose:
+John Doe
+Alice Smith
+Rahul Sharma
+Output:
+John_Doe
+Alice_Smith
+Rahul_Sharma
+Explanation
+The command:
+s/ /_/g
+contains:
+s -> substitute
+' ' -> a space
+_ -> replacement character
+g -> all occurrences
+So every space on every line is replaced with _.
+15. How to Replace Only the First Space?
+Command
+sed 's/ /_/' Names.txt
+If the line is:
+John Michael Doe
+the output is:
+John_Michael Doe
+Only the first space is replaced.
+Difference
+Command
+Effect
+sed 's/ /_/' Names.txt
+Replaces the first matching space on each line.
+sed 's/ /_/g' Names.txt
+Replaces every matching space on each line.
+
+
+Regular Expressions
+16. What Does . Mean in sed?
+The dot . represents any single character.
+Suppose:
+cat
+bat
+hat
+dog
+Run:
+sed 's/.at/XXX/' file.txt
+Output:
+XXX
+XXX
+XXX
+dog
+Why?
+The pattern:
+.at
+means:
+. -> any one character
+a -> the letter a
+t -> the letter t
+Therefore it matches cat, bat, and hat — but not dog.
+17. What Does [^ ] Mean?
+The expression [^ ] means:
+Match any character that is not a space.
+The ^ inside the square brackets has a different meaning from the ^ used at the beginning of a pattern.
+For example, [^ ] means not a space.
+When we add *:
+[^ ]*
+it means:
+Match zero or more characters that are not spaces.
+This is commonly used to match a word.
+18. How to Match the First Word of Each Line?
+Command
+sed 's/[^ ]*/WORD/' Names.txt
+Suppose:
+John Doe
+Alice Smith
+Rahul Sharma
+Output:
+WORD Doe
+WORD Smith
+WORD Sharma
+Explanation
+[^ ] -> any character except a space.
+* -> repeat the previous pattern zero or more times.
+Therefore [^ ]* matches characters until a space is encountered.
+For John Doe it matches John.
+Capturing Groups
+19. What is a Group in sed?
+A group allows us to capture a portion of the text so that we can use that matched text again in the replacement.
+In basic sed regular expressions, groups are written as:
+\(...\)
+For example:
+sed 's/\([^ ]*\)/{\1}/' Names.txt
+If the file contains:
+John Doe
+Alice Smith
+output:
+[John] Doe
+[Alice] Smith
+Explanation
+\([^ ]*\)
+captures the first word. This becomes Group 1.
+We can refer to Group 1 using:
+\1
+So \1 means:
+Insert whatever text was captured by Group 1.
+20. How to Capture Two Words?
+Command
+sed 's/\([^ ]*\) \([^ ]*\)/{\1}{\2}/' Names.txt
+Suppose:
+John Doe
+Alice Smith
+Output:
+John-Doe
+Alice-Smith
+Understanding the Pattern
+\([^ ]*\) \([^ ]*\)
+contains two groups.
+First group \([^ ]*\) -> captures the first word.
+Second group \([^ ]*\) -> captures the second word.
+The replacement is:
+\1-\2
+where:
+\1 -> first captured group
+\2 -> second captured group
+Therefore John Doe becomes John-Doe.
+Final Experiment: Swapping Two Words
+21. How to Swap the First Two Words of Every Line?
+Command
+sed 's/^\([^ ]*\) \([^ ]*\)/\2 \1/' Names.txt
+Suppose Names.txt contains:
+John Doe
+Alice Smith
+Rahul Sharma
+Aniket Singh
+Output:
+Doe John
+Smith Alice
+Sharma Rahul
+Singh Aniket
+Detailed Explanation
+The search pattern is:
+^\([^ ]*\) \([^ ]*\)
+Break it into parts:
+Pattern piece
+Meaning
+^
+Start at the beginning of the line.
+\([^ ]*\)
+Capture the first word as Group 1.
+[space]
+Match the space between the first and second words.
+\([^ ]*\)
+Capture the second word as Group 2.
+
+
+So for John Doe, sed identifies:
+Group 1 -> John
+Group 2 -> Doe
+The replacement is:
+\2 \1
+Therefore:
+Group 2 + space + Group 1
+becomes:
+Doe John
+The same process is performed for every line.
+Complete Working Example
+Create the file:
+nano Names.txt
+Enter:
+John Doe
+Alice Smith
+Rahul Sharma
+Aniket Singh
+Save the file. Run:
+sed 's/^\([^ ]*\) \([^ ]*\)/\2 \1/' Names.txt
+Output:
+Doe John
+Smith Alice
+Sharma Rahul
+Singh Aniket
+To Modify the Original File
+Use:
+sed -i 's/^\([^ ]*\) \([^ ]*\)/\2 \1/' Names.txt
+Now Names.txt itself will contain:
+Doe John
+Smith Alice
+Sharma Rahul
+Singh Aniket
+Important sed Commands and Symbols
+Symbol / Command
+Meaning
+sed
+Stream Editor
+-n
+Suppress automatic printing
+p
+Print
+d
+Delete
+s
+Substitute
+g
+Apply replacement globally on each line
+-i
+Modify the original file
+-i.bak
+Modify file and create a backup
+^
+Beginning of line
+$
+End of line
+.
+Any single character
+*
+Zero or more occurrences
+[^ ]
+Any character except space
+\(...\)
+Capture a group
+\1
+First captured group
+\2
+Second captured group
+
+
+Key Idea to Remember
+The final command:
+sed 's/^\([^ ]*\) \([^ ]*\)/\2 \1/' Names.txt
+can be understood as:
+Find:
+    beginning -> first word -> space -> second word
+Store:
+    first word  -> Group 1
+    second word -> Group 2
+Replace with:
+    Group 2 -> space -> Group 1
+Therefore John Doe becomes Doe John.
+The most important idea is that sed first identifies the text using a pattern and then constructs the replacement using the captured groups.
+Swapping Words with Sed
+sed (stream editor) is a powerful utility for text manipulation that allows you to reorder or modify data streams efficiently. A common use case is automatically switching the positions of the first two words on every line of a file.
+The Command:
+sed -i 's/^\([^ ]*\) \([^ ]*\)/\2 \1/' Names.txt
+Example: Running this on a file containing "John Doe" will instantly change the line to "Doe John".
+What happens:
+The command processes names.txt line by line, identifying the first word (group 1) and the second word (group 2) via the regular expression ^([^ ]*) ([^ ]*).
+The replacement pattern \2 \1 swaps their positions, and the -i flag saves these modifications directly to the file.
+Pro Tip: Use sed -i.bak to create a backup of the original file before applying changes.
+Breakdown of the Sed Syntax
+The command sed -i 's/\([^ ]*\) \([^ ]*\)/\2 \1/' filename.txt is composed of several powerful elements:
+sed: Invokes the stream editor utility to process text data.
+-i: The "in-place" flag, which saves all modifications directly to the target file.
+'s/ ... / ... /': Denotes the substitution operation
+^: An anchor specifying the beginning of a text line.
+\([^ ]*\): Group 1, which identifies the initial word by matching characters that are not spaces.
+(space): Explicitly matches the literal space character between distinct words.
+\([^ ]*\): Group 2, which isolates the subsequent word in the sequence.
+\2 \1: The replacement order. It puts the second word (\2) first, then a space, followed by the first word (\1).
