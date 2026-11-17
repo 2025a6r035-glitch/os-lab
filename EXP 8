@@ -1,0 +1,451 @@
+Experiment 8: Observing Process Memory Maps Using pmap
+A comprehensive technical manual examining process virtual address space layout, page permissions, resident memory, dirty pages, shared libraries, and heap allocation through deep inspection with pmap -x.
+Experiment 8: Observing Process Memory Maps Using pmap
+1. Aim
+To examine the memory mappings of the CPU-bound and I/O-bound programs from Experiment 7 using the pmap command.
+2. Procedure
+Step 1: Run both programs
+./io_bound &
+./cpu_bound &
+
+
+Step 2: Find their PIDs
+pgrep -af 'io_bound|cpu_bound'
+
+
+Step 3: Display the CPU-bound process memory map
+pmap <CPU_PID>
+
+
+For detailed output:
+pmap -x <CPU_PID>
+
+
+Step 4: Display the I/O-bound process memory map
+pmap <IO_PID>
+
+
+For detailed output:
+pmap -x <IO_PID>
+
+
+Replace the placeholders with the actual PIDs.
+3. What to Expect in pmap Output
+The two programs contain different instructions, but both are C programs running under Linux. Their memory maps therefore contain broadly similar types of regions.
+Memory Region
+Meaning in These Programs
+Executable code
+Machine instructions generated from the C source
+Data/BSS
+Storage for applicable global or static variables
+Stack
+Function-call information and local variables, where stored on the stack
+Heap
+Dynamic memory allocations, if any
+Shared libraries
+Libraries required by the program, such as the C standard library
+Other mappings
+Additional regions used by the runtime and operating system
+
+
+In the CPU-bound program, counter is a local variable. In the I/O-bound program, fp is a local file pointer. Both programs may have stack mappings, but the compiler can choose how individual variables are stored.
+Neither program explicitly calls malloc(), so neither needs a large dynamic allocation for its main task.
+4. Understanding the Output
+Run:
+pmap -x <PID>
+
+
+The output of pmap -x has six columns. Each row describes one contiguous region of the process's virtual address space.
+4.1 Column Summary
+Column
+Simple Meaning
+Address
+Where the memory region starts
+Kbytes
+Total size of the region, in kilobytes
+RSS
+How much of the region is actually in RAM right now
+Dirty
+How much of the region has been changed
+Mode
+What the program is allowed to do with the region
+Mapping
+What the region belongs to
+
+
+4.2 Each Column in Simple Words
+Imagine a street with many plots of land. Each plot is one memory region of the process. The columns describe each plot.
+Address: the house number
+This is the number that tells you where the region starts. It is a virtual address, which means it is private to the process. Two different processes can have the same address and still use completely different memory.
+Kbytes: the size of the plot
+This is the total size reserved for the region. The program may not be using all of it yet, so a big number here does not mean a lot of RAM is being used.
+RSS: the part that is actually occupied
+RSS shows how much of the region is really loaded in physical RAM at this moment. Memory that has never been used is not counted. So RSS is always the same as or smaller than Kbytes.
+Dirty: the part that has been changed
+Dirty shows how much of the region the program has modified. Code is never changed, so its Dirty value is usually 0. Data and stack are changed while the program runs, so they show a Dirty value above 0. Dirty is always the same as or smaller than RSS.
+Mode: the rules for the region
+Mode tells you what the program may do with the region.
+Letter
+Meaning
+Example
+r
+Read: the program can look at the memory
+Almost every region
+w
+Write: the program can change the memory
+Data and stack
+x
+Execute: the CPU can run the memory as instructions
+Program code
+-
+This permission is not given
+Any position
+
+
+The first three letters are read, write and execute, in that order. For example:
+r-x means the region can be read and run, but not changed. This is program code.
+rw- means the region can be read and changed, but not run. This is data or stack.
+r-- means the region can only be read, such as fixed constant values.
+These rules protect the program from mistakes, such as accidentally overwriting its own code.
+Mapping: the owner's name
+This tells you what the region belongs to. It can be:
+the program itself, such as cpu_bound
+a shared library, such as libc.so.6
+a special region, such as [ stack ] or [ anon ] (memory that is not tied to any file)
+The exact names can differ between Linux systems.
+4.3 Quick Summary
+Size order: Dirty ≤ RSS ≤ Kbytes. The changed part sits inside the part in RAM, which sits inside the total size.
+Mode tells you the type of region: r-x is code, rw- is data or stack.
+Mapping tells you which file or region it is.
+The last line (total kB) adds up Kbytes, RSS and Dirty for the whole process.
+4.4 Illustrative Output
+The following is a shortened example only. Addresses, sizes and names will be different on your system.
+Address           Kbytes     RSS   Dirty Mode  Mapping
+0000563c1a2b4000       4       4       0 r---- cpu_bound
+0000563c1a2b5000       4       4       0 r-x-- cpu_bound
+0000563c1a2b7000       4       4       4 rw--- cpu_bound
+00007f8e3c000000    1892    1124       0 r-x-- libc.so.6
+00007ffd5e2a1000     132      12      12 rw--- [ stack ]
+...
+total kB          2500    1400     120
+
+
+Example: Take the cpu_bound row with Mode r-x--. It is 4 KB in size, all of it is in RAM, none of it has been changed (Dirty is 0), and it can be read and run but not changed. This tells us it is the program's code.
+4.5 Walkthrough Using a Real Output of pmap -x 7714 (English)
+The pmap -x 7714 output has six columns. Let us understand them one by one using examples from the actual output, so that you can understand them yourself and also teach them to students.
+1. Address: where does the memory region start?
+Example:
+00005ddafa875000
+
+
+This is the starting address of one memory region in the virtual address space of the process.
+Just as a house has a postal address, the virtual memory regions of a process have addresses. The operating system uses these addresses to locate and manage memory.
+Each row shows one memory mapping.
+Different regions can have different starting addresses.
+It is not necessarily a direct physical RAM address.
+To students: Address tells where this region starts in the virtual memory of the process.
+2. Kbytes: how big is the memory region?
+From the output:
+Address           Kbytes
+00005ddafa875000       4
+000076ec1b228000    1632
+
+
+This means:
+The first region is 4 KB.
+The second region is 1632 KB.
+Kbytes shows the total size of that particular mapping. It is the size of that row only, not of the whole process memory.
+To students: If Kbytes = 1632, the size of this mapping is 1632 KB. It is not necessary that all of this memory is loaded in physical RAM.
+3. RSS: how much memory is resident in physical RAM?
+RSS stands for Resident Set Size.
+Example from the output:
+Address           Kbytes    RSS
+000076ec1b228000    1632    1056
+
+
+Here:
+Total size of the mapping = 1632 KB
+Resident memory of that mapping = 1056 KB
+This means 1056 KB of the pages of this mapping were resident in physical RAM at that moment.
+The remaining pages are not necessarily in RAM at that time. Do not treat RSS as exact private memory, because shared pages can also be counted in RSS.
+To students: Kbytes is the total size of the mapping, while RSS shows how much of that mapping is resident in physical RAM.
+4. Dirty: how much memory has been modified?
+Example:
+Kbytes    RSS    Dirty
+4          4       4
+
+
+Dirty shows the size of modified memory pages that are not in a clean state relative to their backing storage.
+Simple example: a program changes a value in writable memory. That memory page can be marked dirty.
+Note that dirty memory does not simply mean data that has not been saved to disk. Dirty pages of anonymous memory and file-backed memory can behave differently.
+In the output, Dirty = 0 means that no dirty memory was reported for that mapping.
+To students: The Dirty column shows how much memory in the mapping is counted as dirty, that is, associated with modified memory pages.
+5. Mode: which operations are allowed on the memory?
+Examples from the output:
+r----
+r-x--
+rw---
+
+
+Meaning of the letters:
+Symbol
+Meaning
+r
+Read: the memory can be read
+w
+Write: the memory can be written to
+x
+Execute: instructions can be executed
+-
+That permission is not given
+
+
+Examples:
+r----: Read permission is given.
+r-x--: Read and execute permissions are given.
+rw---: Read and write permissions are given.
+These permissions are part of memory protection. They let the operating system give different access rights to different memory regions of a process.
+To students: Mode shows whether the process can read, write or execute that memory region.
+6. Mapping: what is the memory associated with?
+Values from the output:
+exp7a
+libc.so.6
+ld-linux-x86-64.so.2
+[ anon ]
+[ stack ]
+
+
+Their meaning:
+Mapping
+Meaning
+exp7a
+Memory mapping of your compiled executable
+libc.so.6
+Mapping of the C standard library
+ld-linux-x86-64.so.2
+Mapping of the dynamic linker/loader
+[ anon ]
+Anonymous memory mapping, not directly associated with a named file
+[ stack ]
+Stack mapping of the main thread
+
+
+To students: The Mapping column shows the name or the source of the memory region.
+7. Reading one complete row
+Take this row from the actual output:
+000076ec1b228000  1632  1056  0  r-x--  libc.so.6
+
+
+Read it from left to right:
+Column
+Value
+Meaning
+Address
+000076ec1b228000
+Starting address of the virtual memory region
+Kbytes
+1632 KB
+Total size of this mapping
+RSS
+1056 KB
+Resident physical memory of this mapping
+Dirty
+0 KB
+No dirty memory was reported
+Mode
+r-x--
+Read and execute permissions
+Mapping
+libc.so.6
+This is the mapping of the C standard library
+
+
+8. The last row: total kB
+From the screenshot:
+total kB    2772    1744    96
+
+
+Meaning:
+2772 KB: total mapped size of all the listed mappings.
+1744 KB: total reported RSS of these mappings.
+96 KB: total reported dirty memory.
+These are totals, not the numbers of any single mapping.
+Final summary: Address tells where, Kbytes tells how much is mapped, RSS tells how much is resident in physical RAM, Dirty tells how much memory is counted as dirty, Mode tells which permissions apply, and Mapping tells which executable, library or memory type the region is associated with.
+4.6 Walkthrough Using a Real Output of pmap -x 7714 (Hinglish)
+Tumhare pmap -x 7714 output mein 6 columns hain. Inhe ek-ek karke tumhare actual output ke examples se samajhte hain, taaki tum khud bhi samajh sako aur end users ko bhi padha sako.
+1. Address: memory region kahan start hota hai?
+Example:
+00005ddafa875000
+
+
+Ye process ke virtual address space mein ek memory region ka starting address hai.
+Jaise kisi ghar ka postal address hota hai, waise hi process ke virtual memory regions ke addresses hote hain. Operating system in addresses ka use memory ko locate aur manage karne ke liye karta hai.
+Har row ek memory mapping dikhati hai.
+Alag regions ke alag starting addresses ho sakte hain.
+Ye physical RAM ka direct address zaroori nahi hai.
+End user ko bolo: Address batata hai ki process ki virtual memory mein ye region kahan se start hota hai.
+2. Kbytes: memory region kitna bada hai?
+Tumhare output mein:
+Address           Kbytes
+00005ddafa875000       4
+000076ec1b228000    1632
+
+
+Iska matlab:
+Pehla region 4 KB ka hai.
+Doosra region 1632 KB ka hai.
+Kbytes batata hai ki us particular mapping ka total size kitna hai. Ye sirf us row ka size hai, poore process ki memory nahi.
+End user ko bolo: Agar Kbytes = 1632 hai, toh is mapping ka size 1632 KB hai. Ye zaroori nahi ki saari memory physical RAM mein loaded ho.
+3. RSS: kitni memory physical RAM mein resident hai?
+RSS ka full form Resident Set Size hai.
+Tumhare output ka example:
+Address           Kbytes    RSS
+000076ec1b228000    1632    1056
+
+
+Yahan:
+Mapping ka total size = 1632 KB
+Us mapping ka resident memory = 1056 KB
+Matlab is mapping ke 1056 KB pages us waqt physical RAM mein resident the.
+Baaki memory ke pages zaroori nahi ki us waqt RAM mein resident hon. RSS ko exact private memory mat samajhna, kyunki shared pages bhi RSS mein count ho sakte hain.
+End user ko bolo: Kbytes mapping ka total size hai, jabki RSS batata hai ki us mapping ka kitna memory hissa physical RAM mein resident hai.
+4. Dirty: kitni memory modified hui hai?
+Example:
+Kbytes    RSS    Dirty
+4          4       4
+
+
+Dirty modified memory pages ka size batata hai, jo clean state mein nahi hain relative to their backing storage.
+Simple example: program ne writable memory mein koi value change ki. Us memory page ko dirty mark kiya ja sakta hai.
+Lekin dhyan rahe, dirty memory ka matlab sirf ye nahi ki data disk par save nahi hua hai. Anonymous memory aur file-backed memory ke dirty pages ka behavior alag ho sakta hai.
+Tumhare output mein Dirty = 0 ka matlab hai ki us mapping ke liye dirty memory report nahi hui.
+End user ko bolo: Dirty column batata hai ki mapping mein kitni memory dirty count hui hai, yani modified memory pages se associated hai.
+5. Mode: memory par kya operations allowed hain?
+Tumhare output mein examples hain:
+r----
+r-x--
+rw---
+
+
+In letters ka meaning:
+Symbol
+Meaning
+r
+Read: memory ko padh sakte hain
+w
+Write: memory mein likh sakte hain
+x
+Execute: instructions execute kar sakte hain
+-
+Woh permission nahi hai
+
+
+Examples:
+r----: Read permission hai.
+r-x--: Read aur execute permissions hain.
+rw---: Read aur write permissions hain.
+Ye permissions memory protection ka hissa hain. Inse operating system process ke memory regions ko alag-alag access rights de sakta hai.
+End user ko bolo: Mode batata hai ki process us memory region ko read, write ya execute kar sakta hai ya nahi.
+6. Mapping: memory kis cheez se associated hai?
+Tumhare output mein ye values hain:
+exp7a
+libc.so.6
+ld-linux-x86-64.so.2
+[ anon ]
+[ stack ]
+
+
+Inka meaning:
+Mapping
+Meaning
+exp7a
+Tumhare compiled executable ki memory mapping
+libc.so.6
+C standard library ki mapping
+ld-linux-x86-64.so.2
+Dynamic linker/loader ki mapping
+[ anon ]
+Anonymous memory mapping, jo kisi named file se directly associated nahi
+[ stack ]
+Main thread ki stack mapping
+
+
+End user ko bolo: Mapping column memory region ka naam ya uska source dikhata hai.
+7. Ab ek row ko poora read karna seekho
+Tumhare actual output ki ye row dekho:
+000076ec1b228000  1632  1056  0  r-x--  libc.so.6
+
+
+Isko left se right read karo:
+Column
+Value
+Meaning
+Address
+000076ec1b228000
+Virtual memory region ka starting address
+Kbytes
+1632 KB
+Is mapping ka total size
+RSS
+1056 KB
+Is mapping ki resident physical memory
+Dirty
+0 KB
+Koi dirty memory report nahi hui
+Mode
+r-x--
+Read aur execute permissions hain
+Mapping
+libc.so.6
+Ye C standard library ki mapping hai
+
+
+8. Last row: total kB
+Tumhare screenshot mein:
+total kB    2772    1744    96
+
+
+Iska meaning:
+2772 KB: Sabhi listed mappings ka total mapped size.
+1744 KB: In mappings ka total reported RSS.
+96 KB: Total reported dirty memory.
+Ye totals hain, kisi ek mapping ke numbers nahi.
+Final summary: Address batata hai kahan, Kbytes kitna mapped hai, RSS kitna physical RAM mein resident hai, Dirty kitni memory dirty count hui hai, Mode kaunsi permissions hain, aur Mapping batata hai ki region kis executable, library ya memory type se associated hai.
+The precise output and values depend on the Linux system and the process.
+5. Observation Table
+Record your actual readings.
+Parameter
+CPU-Bound Process
+I/O-Bound Process
+Executable mapping
+Present
+Present
+Shared libraries
+Typically present
+Typically present
+Stack
+Typically present
+Typically present
+Total mapped memory
+Record actual value
+Record actual value
+RSS
+Record actual value
+Record actual value
+
+
+6. Analysis
+The CPU-bound program performs repeated calculations, while the I/O-bound program writes to a file and sleeps. These differences primarily affect CPU utilization and waiting time, not necessarily the size of the memory map.
+The pmap command lets you inspect how memory is mapped for each process. It does not directly measure CPU share; that is the role of top.
+7. Result
+The memory maps of both programs were examined using pmap and pmap -x. Their executable mappings, stack, shared libraries and memory statistics were observed and compared.
+8. Cleanup
+After completing both experiments, identify the relevant PIDs:
+pgrep -af 'io_bound|cpu_bound'
+
+
+Terminate the processes using their actual PIDs:
+kill <IO_PID> <CPU_PID>
+
+
+This prevents the infinite loops from continuing to run after the experiment.
