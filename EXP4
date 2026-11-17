@@ -1,0 +1,359 @@
+Experiment 4: User Session Tracking, Line Ranges & Text Processing
+A comprehensive technical manual detailing Unix user session tracking, timestamp epoch conversions, line-range extraction via stream editing, argument shifting, and batch text deletion algorithms in Linux.
+Shell Scripting Lab
+Experiments 1–3: Bash Scripts, Line by Line
+Experiment 1 — Determine User Working Period
+sudo apt install coreutils-from-gnu coreutils-from-uutils- --allow-remove-essential
+Complete Code
+#!/bin/bash
+ 
+read -p "Enter username: " user
+ 
+login_time=$(who | awk -v u="$user" '$1 == u {print $3, $4; exit}')
+ 
+if [ -z "$login_time" ]
+then
+    echo "User is not currently logged in."
+else
+    echo "Login time: $login_time"
+    login_seconds=$(date -d "$login_time" +%s)
+    current_seconds=$(date +%s)
+    total_seconds=$((current_seconds - login_seconds))
+    hours=$((total_seconds / 3600))
+    minutes=$(((total_seconds % 3600) / 60))
+    echo "Total working time: $hours hours $minutes minutes"
+fi
+
+
+1. Login Time Command
+The main command used to find the user's login time is:
+login_time=$(who | awk -v u="$user" '$1 == u {print $3, $4; exit}')
+
+
+Let's understand it word by word.
+A. login_time
+login_time is a variable. It stores the user's login date and time, for example login_time = "2026-09-09 10:30".
+
+
+B. =
+The = sign means assignment — store the value on the right inside the variable on the left, e.g. a=10.
+
+
+C. $( )
+This is called command substitution: it runs the command inside the parentheses and captures its output. For example, today=$(date) stores the output of date in today. So login_time=$(who | awk ...) runs who | awk ... and stores its output in login_time.
+Remember: $() → run command + capture output.
+
+
+2. who
+The who command shows currently logged-in users, for example:
+aniket   pts/0   2026-09-09   10:30
+Rahul    pts/1   2026-09-09   11:15
+
+
+Each line has four columns:
+Field
+Meaning
+$1
+user
+$2
+terminal
+$3
+date
+$4
+time
+
+
+So for the first row above: $1 = aniket, $2 = pts/0, $3 = 2026-09-09, $4 = 10:30.
+3. Pipe |
+In who | awk, the pipe | sends the output of who to awk — i.e. "take the output of who and give it to awk."
+
+
+4. awk
+awk is a text-processing tool. It reads input line by line and splits each line into fields ($1, $2, $3, …).
+
+
+5. -v
+-v creates/sets an AWK variable. In our code, -v u="$user" creates an AWK variable called u and gives it the value of the Bash variable $user. So if user=aniket, then inside AWK u=aniket.
+
+
+6. u
+This is simply the AWK variable name — short for "user". We could equally have written -v username="$user".
+
+
+7. $user
+This is the Bash variable holding the username entered via read -p "Enter username: " user. If the user types "aniket" at the prompt, then $user = aniket, and it is passed into AWK as u="$user".
+
+
+8. AWK Single Quotes
+The single quotes around '$1 == u {print $4}' tell the shell to pass this entire AWK program to AWK without interpreting it. Everything inside is AWK logic, not Bash.
+
+
+9. $1
+In AWK, $1 means the first field of the current line — e.g. "aniket" in the example row above.
+
+
+10. ==
+$1 == u compares for equality: is field 1 equal to the value stored in u? If $1 = aniket and u = aniket, the comparison is true.
+
+
+11. { }
+The curly braces contain the action AWK performs when the condition is true. The general AWK structure is condition { action }, so $1 == u {print $3, $4} means: if the first field matches the username, run the action.
+
+
+15. print, $4
+print displays output. print $3, $4 prints the third field (date) and fourth field (time) — for the example row, 2026-09-09 10:30. The comma tells AWK to separate the two fields with its default output separator (a space).
+
+
+16. Putting the AWK Part Together
+who | awk -v u="$user" '$1 == u { print $3, $4; exit}'
+
+
+Read as: get currently logged-in users → find the specified username → print that user's date and time.
+Example: given the who output above with user = aniket, AWK checks $1 == u for each row — TRUE for aniket, FALSE for rahul — so only "10:30" is printed.
+17. Final Login-Time Assignment
+login_time=$(who | awk -v u="$user" '$1 == u { print $3, $4; exit}')
+Ultimately, login_time becomes "2026-09-09 10:30".
+
+
+One-line meaning: find the specified user's login date and time and store it in login_time.
+Quick Anatomy
+Part
+Meaning
+login_time
+Variable to store login time
+=
+Assignment
+$( )
+Execute command and capture output
+who
+Show logged-in users
+|
+Send output to next command
+awk
+Process text
+-v
+Create/set AWK variable
+u
+AWK variable for username
+$user
+Bash variable containing username
+$1
+First AWK field
+==
+Compare equality
+{ }
+AWK action
+print
+Display output
+$3
+Third field — date
+$4
+Fourth field — time
+
+
+Checking Whether the User Is Logged In
+if [ -z "$login_time" ]
+
+
+This condition checks: "Is login_time empty?" If YES, the user is not currently logged in. If NO, the user is logged in and the script continues with the time calculation.
+Unix Timestamps and the Time Calculation
+This is the trick that lets the script calculate working time:
+login_seconds=$(date -d "$login_time" +%s)
+current_seconds=$(date +%s)
+total_seconds=$((current_seconds - login_seconds))
+
+
+1. The Problem
+Suppose the user logged in at 10:30 AM and it is currently 2:45 PM. We want 2:45 PM − 10:30 AM = 4 hours 15 minutes. Subtracting clock times directly is awkward, so Linux converts both times into seconds first, subtracts, and converts the result back into hours and minutes.
+2. What Is a Unix Timestamp?
+A Unix timestamp is the number of seconds that have passed since January 1, 1970, 00:00:00 UTC — a reference point known as the Unix epoch. Instead of representing a moment as "10:30 AM", Linux represents it as one large number of elapsed seconds.
+3. Why 1970?
+Unix systems simply chose January 1, 1970 as a fixed starting point and count seconds from there. It doesn't mean computers started counting time in 1970 — it's just an agreed reference date.
+4. date +%s
+Part
+Meaning
+date
+Linux command for date/time
++%s
+Ask date to output the Unix timestamp
+
+
+For example, date +%s might output 1788957000 — meaning 1,788,957,000 seconds have elapsed since the epoch. This number changes every second.
+
+
+5. Why Seconds?
+Because subtraction becomes trivial. If login timestamp = 1000 and current timestamp = 5500, then total_seconds = 5500 − 1000 = 4500 seconds — the exact duration.
+6. login_seconds=$(date -d "$login_time" +%s)
+Given login_time = "2026-09-09 10:30", this command converts that date/time into Unix timestamp seconds, e.g. login_seconds = 1788957000.
+7. What Does -d Do?
+Command
+Result
+date +%s
+Timestamp for right now
+date -d "2026-09-09 10:30" +%s
+Timestamp for that specific date and time
+
+
+The -d flag means "use the date/time that I provide" instead of the current moment.
+
+
+8. current_seconds=$(date +%s)
+This simply gets the Unix timestamp right now, e.g. current_seconds = 1788972300.
+
+
+9. Subtracting the Timestamps
+total_seconds=$((current_seconds - login_seconds))
+
+$(()) means arithmetic calculation. So, 1788972300 - 1788957000 = 15300 seconds → total_seconds = 15300.
+
+
+10. Putting It Together
+Quantity
+Value
+Login time (10:30 AM)
+1788957000
+Current time (2:45 PM)
+1788972300
+Difference
+15300 seconds = 4 hours 15 minutes
+
+
+11. Timestamp vs. Duration
+Value
+Meaning
+login_seconds
+Point in time when the user logged in
+current_seconds
+Point in time right now
+total_seconds
+Duration the user has been logged in
+
+
+Easy memory trick: login_seconds → WHEN did they log in? current_seconds → WHEN is it now? total_seconds → HOW LONG have they worked? The script then converts total_seconds into hours and minutes using / 3600 and % 3600.
+Experiment 2 — Display Lines Between Start and End Line Numbers
+Complete Shell Script
+#!/bin/bash
+ 
+if [ "$#" -ne 3 ]
+then
+    echo "Usage: $0 filename start_line end_line"
+    exit 1
+fi
+ 
+file="$1"
+start="$2"
+end="$3"
+ 
+sed -n "${start},${end}p" "$file"
+
+
+How to Run It
+Suppose names.txt contains:
+Amit
+Rahul
+Aniket
+Rohit
+Neha
+Priya
+Karan
+Aman
+
+
+Running:
+./script.sh names.txt 3 6
+
+
+produces:
+Aniket
+Rohit
+Neha
+Priya
+
+
+What the Arguments Mean
+Argument
+Meaning
+$1
+filename → names.txt
+$2
+start line → 3
+$3
+end line → 6
+
+
+So the command sed -n "${start},${end}p" "$file" effectively becomes sed -n "3,6p" "names.txt", which means: print lines 3 to 6 from names.txt.
+
+
+Experiment 3 — Delete Lines Containing a Specified Word
+Complete Code
+#!/bin/bash
+ 
+if [ "$#" -lt 2 ]
+then
+    echo "Usage: $0 word file1 [file2 ...]"
+    exit 1
+fi
+ 
+word="$1"
+shift
+ 
+for file in "$@"
+do
+    sed -i "/$word/d" "$file"
+done
+
+
+Example
+Suppose we have names.txt, students.txt, and teachers.txt. Running:
+./script.sh Aniket names.txt students.txt teachers.txt
+
+
+gives the arguments:
+Argument
+Value
+$1
+Aniket
+$2
+names.txt
+$3
+students.txt
+$4
+teachers.txt
+
+
+After word="$1", word = Aniket. Then shift removes Aniket from the argument list, leaving names.txt students.txt teachers.txt as $@.
+
+
+The for Loop
+for file in "$@"
+do
+    sed -i "/$word/d" "$file"
+done
+This takes each file from $@ (names.txt → students.txt → teachers.txt), stores it temporarily in file, and runs the sed command on it.
+
+
+The Most Important Command
+With word = Aniket and file = names.txt, sed -i "/$word/d" "$file" effectively becomes:
+sed -i "/Aniket/d" "names.txt"
+
+
+Part
+Meaning
+sed
+Stream editor
+-i
+Modify the file directly
+/Aniket/
+Find lines containing Aniket
+d
+Delete those lines
+"$file"
+Current file
+
+
+Overall Logic
+Take a word plus multiple files as arguments.
+Use "shift" to remove the word, leaving only the filenames in "$@".
+Loop over each file in "$@".
+For each file, run sed to delete every line containing the word.
+This version is short, practical, and easy to explain — a good fit for a lab demonstration.
