@@ -1,0 +1,476 @@
+Experiment 6: Memory Allocation & Virtual Memory in C
+A comprehensive technical manual investigating virtual memory management, demand paging, physical RAM allocation via 4096-byte MMU page faults, and real-time system monitoring using free -h and watch.
+OS LAB WALKTHROUGH — C, LINUX, VIRTUAL MEMORY
+
+
+Anatomy of a Memory-Allocating C Program
+A line-by-line breakdown of a small C program that takes a size in megabytes from the command line, allocates that much memory, actually touches every page of it, holds it open so you can watch it in free -h, and releases it cleanly when Ctrl+C is pressed.
+Language
+Platform
+Concepts
+Sections
+C
+Linux
+argc/argv, malloc, paging, signals
+18
+
+
+01  The Program
+
+
+Here's the whole thing before it gets taken apart. It's deliberately small — one malloc, one loop, one infinite wait — so that every line can be tied back to a specific OS concept.
+MEMORY.C
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[])
+{
+    int mb;
+
+    if (argc != 2)
+    {
+        printf("Usage: %s <memory_in_MB>\n", argv[0]);
+        return 1;
+    }
+
+    mb = atoi(argv[1]);
+
+    char *memory = malloc(mb * 1024 * 1024);
+
+    if (memory == NULL)
+    {
+        printf("Memory allocation failed\n");
+        return 1;
+    }
+
+    for (int i = 0; i < mb * 1024 * 1024; i += 4096)
+    {
+        memory[i] = 1;
+    }
+
+    printf("%d MB memory allocated.\n", mb);
+    printf("Program is running... Press Ctrl+C to exit.\n");
+
+    while (1)
+    {
+        sleep(1);
+    }
+
+    return 0;
+}
+
+02  Compiling and Running
+
+
+Two commands are all this needs: compile it, then run it with a number.
+COMPILE
+gcc memory.c -o memory
+
+RUN — ALLOCATE 500 MB
+./memory 500
+
+Here ./memory is the program itself, and 500 is the size in megabytes — it becomes argv[1] inside the program.
+
+
+While it's running, open a second terminal and watch the memory usage change:
+free -h
+watch -n 1 free -h
+
+WHY A SECOND TERMINAL
+
+
+The program blocks forever in its own terminal (that's the point — it needs to keep holding the memory), so a separate window is needed to observe the system's memory counters while it runs.
+03  Header Files
+
+
+Three headers, three jobs. Nothing here does any work by itself — each just makes a family of functions available.
+Header
+Provides
+Used for
+stdio.h
+printf()
+Printing messages to the terminal
+stdlib.h
+malloc(), atoi(), free()
+Allocating memory, converting text to a number, releasing memory
+unistd.h
+sleep()
+Pausing the program so it stays alive
+
+
+04  argc and argv
+
+
+The task specifically calls for taking the memory size as a command-line argument, which is why main is declared with two parameters instead of none:
+int main(int argc, char *argv[])
+
+
+
+
+argc — argument count — is how many words were typed on the command line, including the program's own name. argv — argument vector — is where those words are actually stored, as an array of strings.
+Command line
+argc
+argv[0]
+argv[1]
+./memory 500
+2
+"./memory"
+"500" (a string)
+
+
+Note that argv[1] holds the text "500" — a string of two characters, not the number 500. That distinction is exactly what section 6 deals with.
+05  Checking the Number of Arguments
+
+
+Before trusting argv[1], the program makes sure it actually exists:
+if (argc != 2)
+{
+    printf("Usage: %s <memory_in_MB>\n", argv[0]);
+    return 1;
+}
+
+Exactly one argument is expected from the user, which means argc should equal 2 — the program name plus the size. Running ./memory 500 gives argc = 2, so this check passes silently and execution continues.
+
+
+Running the program with nothing after it —
+./memory
+
+— leaves argc = 1. The condition argc != 2 is now true, so the program prints a usage message and exits with status 1 instead of trying to read an argument that was never given.
+06  Getting the Memory Size
+mb = atoi(argv[1]);
+
+
+
+
+argv[1] is the string "500" — perfectly readable to a human, but useless in arithmetic as far as the compiler is concerned. atoi() ("ASCII to integer") converts it into the actual number 500, which is what gets stored in mb and used for every calculation from here on.
+07  Allocating Memory
+
+
+This is the line the whole exercise is built around:
+char *memory = malloc(mb * 1024 * 1024);
+
+
+
+
+With mb = 500, the expression 500 × 1024 × 1024 works out to roughly 524,288,000 bytes — 500 mebibytes, requested from the heap in one call.
+Why char *?
+memory is declared as a pointer, because that's what malloc() actually gives back: not the memory itself, but the address of where it starts. char is used because it's exactly one byte wide, which makes indexing into the block — memory[i] — line up neatly with individual bytes.
+MEMORY HOLDS THE STARTING ADDRESS
+memory
+  |
+  v
++------+------+------+------+-----+
+| [0]  | [1]  | [2]  | [3]  | ... |
++------+------+------+------+-----+
+ <------  500 x 1024 x 1024 bytes  ------>
+
+08  Checking Whether Allocation Succeeded
+if (memory == NULL)
+{
+    printf("Memory allocation failed\n");
+    return 1;
+}
+
+
+
+
+If the system can't satisfy the request — for instance, if 500 MB genuinely isn't available — malloc() signals that by returning NULL instead of a real address. Checking for that before using memory is what keeps a failed allocation from crashing the program later with an invalid pointer.
+09  Actually Using the Memory
+for (int i = 0; i < mb * 1024 * 1024; i += 4096)
+{
+    memory[i] = 1;
+}
+
+
+
+
+This loop is the part that makes the demonstration actually work. malloc() reserves virtual address space, but Linux doesn't necessarily back all of it with physical RAM right away — a page can stay unmapped until something actually reads or writes it. Without this loop, free -h might not show the full allocation as used.
+The loop steps through the block 4096 bytes at a time, because 4 KB is the standard page size on Linux. Writing one byte per page is enough to force that entire page to become resident — writing to every byte would just do the same work far more slowly.
+REQUESTING VS. BACKING MEMORY
+virtual pages (requested):   [page0] [page1] [page2] [page3] ...
+                                |       |       |       |
+                          memory[i]=1 touches one byte per page
+                                v       v       v       v
+resident in physical RAM:    [page0] [page1] [page2] [page3] ...
+
+THE CORE OS CONCEPT
+
+
+This is the whole point of the lab: a successful malloc() only promises virtual address space. Whether that space is backed by real, physical pages is a separate question — one this loop answers by force.
+10  Displaying the Result
+printf("%d MB memory allocated.\n", mb);
+
+
+
+
+Running ./memory 500 prints:
+500 MB memory allocated.
+
+11  Keeping the Program Running
+printf("Program is running... Press Ctrl+C to exit.\n");
+
+while (1)
+{
+    sleep(1);
+}
+
+
+
+
+while (1) is a loop whose condition is always true, so it never ends on its own — it keeps the program alive indefinitely. Inside it, sleep(1) pauses for one second per iteration rather than spinning a CPU core at full speed for no reason. Together they hold the allocated memory open long enough to inspect it with free -h in another terminal.
+12  Why free(memory) Is Never Reached
+free(memory);
+
+
+
+
+This line sits right after the while (1) loop — but since that loop never exits by itself, execution never falls through to it in normal use. The only way to stop the program is Ctrl+C, which terminates the process outright; the OS then reclaims all of its memory automatically as part of cleaning up.
+A more polished version would catch the interrupt signal and call free() explicitly, but for this experiment it isn't necessary — the operating system's own cleanup does the job. Section 18 builds exactly that version.
+13  The Complete Flow
+
+
+Every piece above fits into one sequence, from typing the command to the OS reclaiming the memory at the end:
+COMMAND TO CLEANUP
+./memory 500
+    |
+    v
+argc = 2, argv[1] = "500"
+    |
+    v
+atoi() -> mb = 500
+    |
+    v
+malloc(500 x 1024 x 1024)
+    |
+    v
+memory != NULL -> allocated
+    |
+    v
+touch every 4096-byte page
+    |
+    v
+while(1) { sleep(1); }  -- holds memory
+    |
+    v
+observe with free -h / watch
+    |
+    v
+Ctrl+C -> OS reclaims memory
+
+TERMINOLOGY NOTE
+
+
+Strictly, 1024 x 1024 bytes is a mebibyte (MiB), not a megabyte (MB) in the SI sense — but lab exercises and everyday usage almost always call it "MB" anyway, so the program's messages follow that convention.
+The experiment, in one sentence: requesting virtual memory and actually using it are two different steps, and this program exists to make that difference visible in free -h.
+14  Converting Megabytes to Bytes
+
+
+Before calling malloc(), the requested size needs to move from megabytes to bytes — the unit malloc() actually works in:
+size_t size = (size_t)mb * 1024 * 1024;
+
+mb holds a human-friendly number like 500. Multiplying it by 1024 twice converts megabytes to kilobytes and then to bytes, giving the true byte count malloc() needs. The result is stored in a size_t — an unsigned integer type wide enough to hold a size in bytes, including sizes larger than a plain int can safely represent.
+MB TO BYTES
+mb            x 1024        x 1024           size
+500   -------------------------------->   524,288,000
+(int)          (KB)          (bytes)        (size_t)
+
+From here on, malloc(size) replaces malloc(mb * 1024 * 1024) — the same value, just computed once and given a name.
+15  The malloc() Call, Revisited
+
+
+With size computed, the allocation itself is just:
+char *memory = malloc(size);
+
+malloc(size) asks the allocator for that many bytes and, on success, returns the address of the first one. char *memory is a pointer wide enough to hold that address — it does not hold the memory itself, only where the memory starts.
+
+
+What a Box Represents
+It's tempting to picture the allocated block as a row of boxes, each one byte wide — and for a char *, that's exactly right, because char is defined to be one byte. But the box size actually comes from the pointer's type, not from a fixed rule:
+char * -> [1 B][1 B][1 B][1 B] ...
+int  * -> [4 B][4 B][4 B][4 B] ...
+
+Because this program uses char *, it's safe to think of the allocated memory as one giant array of single-byte boxes, and memory[i] as reaching directly into box i.
+IF ALLOCATION FAILS
+
+
+malloc() can't always satisfy a request. When it can't, it returns NULL instead of a real address — which is exactly what the next check is for.
+16  Reporting a Failed Allocation
+if (memory == NULL)
+{
+    printf("Memory allocation failed.\n");
+    return 1;
+}
+
+printf() here only reports the problem — it doesn't fix it. The \n moves the terminal to a new line afterward, and the return 1; that follows is what actually ends the program, since continuing with a NULL pointer would crash the moment memory[i] was touched.
+FAILURE PATH
+malloc(size)
+    |
+    v
+allocation failed?
+    |
+   yes
+    |
+    v
+print "Memory allocation failed."
+    |
+    v
+return 1  (exit)
+
+17  Virtual Pages and Physical RAM, Per Process
+
+
+Touching one byte per 4096-byte page, as section 9 covers, tells the operating system that page is actually in use. Extending that idea: a virtual page belonging to one process and a virtual page belonging to another can map to completely different physical RAM frames, even if both processes think of their memory as starting at similar-looking addresses.
+Process A                     Process B
+
+Virtual Page 1                Virtual Page 1
+      |                              |
+      v                              v
+RAM Frame A                    RAM Frame D
+
+
+
+
+Nothing here is permanent, though. Under memory pressure the OS can reclaim, evict, or swap pages regardless of whether a process is technically still "holding" them, and calling free() tells the allocator that virtual range is available for reuse. The safe mental model: a process owns virtual pages, and the OS makes sure real memory backs them when the process touches them — not that touching a page grants permanent ownership of one physical RAM page.
+18  Releasing Memory on Ctrl+C
+
+
+Section 12 pointed out that free(memory) is never reached, because the only way to stop the program is Ctrl+C, which the OS handles by tearing the whole process down. It's possible to do better: catching the SIGINT signal lets the program call free() itself before exiting.
+Step 1 — Add a header
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+
+
+
+
+signal.h provides the signal() function used below to register a handler.
+Step 2 — Make the pointer global
+A signal handler runs outside main() and takes no arguments of its own, so it needs another way to reach memory. Moving the declaration above main() makes that possible:
+char *memory;
+
+Inside main(), the earlier declaration simply drops the type name and assigns the already-global pointer instead: memory = malloc(size);
+
+
+Step 3 — Write the handler
+void handle_sigint(int sig)
+{
+    free(memory);
+    printf("\nMemory released.\n");
+    exit(0);
+}
+
+
+
+
+This function runs whenever the process receives SIGINT — which is exactly what Ctrl+C sends.
+SIGNAL FLOW
+Ctrl+C
+  |
+  v
+SIGINT
+  |
+  v
+handle_sigint()
+  |
+  v
+free(memory)
+  |
+  v
+exit(0)
+
+
+
+
+Step 4 — Register it
+Near the top of main(), before the allocation:
+signal(SIGINT, handle_sigint);
+
+
+
+
+This tells the operating system: when this process receives SIGINT, call handle_sigint() instead of the default action of terminating immediately.
+The Updated Program
+MEMORY.C — WITH SIGNAL HANDLING
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+
+char *memory;
+
+void handle_sigint(int sig)
+{
+    free(memory);
+    printf("\nMemory released.\n");
+    exit(0);
+}
+
+int main(int argc, char *argv[])
+{
+    int mb;
+
+    if (argc != 2)
+    {
+        printf("Usage: %s <memory_in_MB>\n", argv[0]);
+        return 1;
+    }
+
+    signal(SIGINT, handle_sigint);
+
+    mb = atoi(argv[1]);
+
+    size_t size = (size_t)mb * 1024 * 1024;
+
+    memory = malloc(size);
+
+    if (memory == NULL)
+    {
+        printf("Memory allocation failed.\n");
+        return 1;
+    }
+
+    for (int i = 0; i < mb * 1024 * 1024; i += 4096)
+    {
+        memory[i] = 1;
+    }
+
+    printf("Memory allocated successfully.\n");
+    printf("Press Ctrl+C to release memory and exit.\n");
+
+    while (1)
+    {
+        sleep(1);
+    }
+
+    return 0;
+}
+
+
+
+
+Running ./memory 500 and then pressing Ctrl+C now goes through a different ending than before:
+UPDATED CLEANUP PATH
+Ctrl+C
+  |
+  v
+SIGINT
+  |
+  v
+handle_sigint()
+  |
+  v
+free(memory)
+  |
+  v
+"Memory released."
+  |
+  v
+exit(0)
+
+SIGNAL-SAFETY CAVEAT
+
+
+Calling printf() and free() directly inside a signal handler is not considered strictly signal-safe in production code — both can, in rare cases, interact badly with whatever the main program was doing at the exact instant the signal arrived. For a teaching lab this is a fine way to see the mechanism in action; a hardened version would typically set a flag in the handler and do the actual cleanup back in main().
+With Ctrl+C now routed through a real handler, the experiment gains a second lesson on top of the first: requesting memory, actually using it, and cleanly giving it back are three separate steps — and free -h can show you all three.
