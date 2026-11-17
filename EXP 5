@@ -1,0 +1,346 @@
+Experiment 5: String Operations in Shell Script & C
+A comprehensive technical manual analyzing dual-paradigm string manipulation in Linux, comparing high-level Bash parameter expansion against pointer arithmetic in C, and benchmarking execution profiles via the time utility.
+EXPERIMENT5
+String Length and Substring Extraction in Shell Script and C
+1.  Aim
+To write a shell script and an equivalent C program that each:
+find the length of a string entered by the user;
+extract a substring from that string, given a starting position and a number of characters;
+and then compare the execution time of the two programs using the time command.
+
+
+4.  Part A — Shell Script (exp7.sh)
+4.1  Program
+#!/bin/bash
+
+read -p "Enter a string: " str
+
+echo "Length of string: ${#str}"
+
+read -p "Enter starting position: " start
+
+read -p "Enter number of characters: " length
+
+echo "Substring: ${str:$start:$length}"
+
+
+4.2  Line-by-line Explanation
+Step 1 — The shebang
+#!/bin/bash
+
+
+This first line tells Linux which interpreter should run the file — in this case, the Bash shell.
+Step 2 — Taking the string as input
+read -p "Enter a string: " str
+read — takes input from the user.
+-p — displays a prompt before reading.
+"Enter a string: " — the prompt message shown on screen.
+str — the variable in which the input is stored.
+So if the user types hello world, then str="hello world".
+
+
+
+
+Step 3 — Finding the length
+echo "Length of string: ${#str}"
+The important part here is ${#str}:
+# — asks Bash for the length.
+str — the variable being measured.
+
+
+In other words, it returns the number of characters stored in str.
+Input string
+Length
+hello
+5
+hello world
+11
+
+
+Step 4 — Reading the starting position
+read -p "Enter starting position: " start
+If the user enters 2, then start=2.
+
+
+Step 5 — Reading how many characters are needed
+read -p "Enter number of characters: " length
+If the user enters 5, then length=5.
+
+
+Step 6 — Extracting the substring
+echo "Substring: ${str:$start:$length}"
+
+
+The general syntax of this parameter expansion is:
+${ string : start : length }
+ │   │       │       │
+ │   │       │       └── Number of characters to extract
+ │   │       └────────── Starting position
+ │   └────────────────── Variable containing the string
+ └────────────────────── Parameter expansion
+It means: start from position $start and take $length characters.
+
+
+For example:
+Variable
+Value
+str
+hello world
+start
+2
+length
+5
+Result
+llo w
+
+
+4.3  Flow of the Script
+             STRING
+                ↓
+        Find its length
+                ↓
+      Enter starting position
+                ↓
+     Enter number of characters
+                ↓
+        Extract substring
+                ↓
+              OUTPUT
+
+
+4.4  Executing the Script
+chmod +x exp7.sh
+time ./exp7.sh
+chmod +x grants execute permission to the file, and time reports how long the script took to run.
+
+
+4.5  Sample Output
+Enter a string: OperatingSystem
+Length of string: 15
+Enter starting position: 9
+Enter number of characters: 6
+Substring: System
+
+
+Note: Note:  Bash string positions start from 0, so in OperatingSystem the letter O is at position 0 and S (of System) is at position 9.
+
+
+5.  Part B — C Program (exp7.c)
+5.1  Program
+#include <stdio.h>
+
+int main()
+{
+    char str[100];
+    int start, length, i, count = 0;
+
+    printf("Enter a string: ");
+    fgets(str, 100, stdin);
+
+    while (str[count] != '\0' && str[count] != '\n')
+    {
+        count++;
+    }
+
+    printf("Length of string: %d\n", count);
+
+    printf("Enter starting position: ");
+    scanf("%d", &start);
+
+    printf("Enter number of characters: ");
+    scanf("%d", &length);
+
+    printf("Substring: ");
+
+    for (i = start; i < start + length && i < count; i++)
+    {
+        printf("%c", str[i]);
+    }
+
+    printf("\n");
+
+    return 0;
+}
+
+
+5.2  Line-by-line Explanation
+Step 1 — Header file
+#include <stdio.h>
+#include — includes a library in the program.
+stdio.h — the Standard Input/Output library.
+It is required for printf(), scanf() and fgets().
+
+
+
+
+Step 2 — The main function
+int main()
+{
+main() — execution of the program begins here.
+int — indicates that the function returns an integer value.
+
+
+Step 3 — Declaring the variables
+char str[100];
+int start, length, i, count = 0;
+
+
+Variable
+Purpose
+str[100]
+Character array that holds the string, up to 100 characters
+start
+Starting position of the substring
+length
+Number of characters required
+i
+Loop variable
+count
+Counter used to calculate the string length
+
+
+Step 4 — Taking the string as input
+printf("Enter a string: ");
+fgets(str, 100, stdin);
+
+
+The three arguments of fgets() are:
+fgets(str, 100, stdin)
+        ↓    ↓     ↓
+      array size  input
+str — where the input is stored.
+100 — the maximum number of characters to read.
+stdin — standard input, i.e. the keyboard.
+If the user enters hello world, fgets() stores it along with the newline and the terminating null character: hello world\n\0.
+
+
+Step 5 — Finding the string length
+while (str[count] != '\0' && str[count] != '\n')
+{
+    count++;
+}
+
+
+
+
+The loop inspects every character in turn and stops as soon as it reaches either the newline or the null character:
+h e l l o \n \0
+0 1 2 3 4  5   6
+
+
+Input string
+Value of count
+hello
+5
+hello world
+11
+
+
+Step 6 — Displaying the length
+printf("Length of string: %d\n", count);
+%d — prints an integer value.
+count — holds the calculated length.
+\n — moves the cursor to the next line.
+
+
+Step 7 — Taking the starting position
+printf("Enter starting position: ");
+scanf("%d", &start);
+%d — reads an integer.
+&start — the address of the variable start, where scanf() places the value.
+If the user types 2, then start = 2.
+
+
+Step 8 — Taking the substring length
+printf("Enter number of characters: ");
+scanf("%d", &length);
+If the user types 5, then length = 5.
+
+
+Step 9 — Printing the substring
+for (i = start; i < start + length && i < count; i++)
+{
+    printf("%c", str[i]);
+}
+Suppose str = hello world, start = 2 and length = 5. The loop then runs for i = 2, 3, 4, 5, 6:
+h e l l o _ w o r l d
+0 1 2 3 4 5 6 7 8 9 10
+    ↑         ↑
+  start      end
+Output: llo w
+The %c format specifier prints a single character, and the condition i < count prevents the loop from reading past the end of the string.
+
+
+Step 10 — End of the program
+    return 0;
+}
+return 0 — informs the operating system that the program completed successfully.
+} — marks the end of main().
+
+
+5.3  Compiling and Running
+gcc exp7.c -o exp7
+./exp7
+
+
+5.4  Sample Output
+Enter a string: OperatingSystem
+Length of string: 15
+Enter starting position: 9
+Enter number of characters: 6
+Substring: System
+
+
+6.  Comparing the Execution Time
+Run each program with the time command placed before it:
+time ./exp7
+time ./exp7.sh
+
+
+6.1  Reading the Output of time
+The output generally looks like this:
+real    0m0.005s
+user    0m0.001s
+sys     0m0.004s
+
+
+Field
+Meaning
+real
+Total elapsed (wall-clock) time from start to finish
+user
+CPU time spent executing user-level code
+sys
+CPU time spent in kernel/system calls
+
+
+1. real
+real    0m0.005s
+Real time = actual elapsed time from the moment your program starts until it finishes.
+Here:
+0.005 seconds = 5 milliseconds
+Think of it as a stopwatch:
+START ───────────────► END
+          0.005 sec
+2. user
+user    0m0.001s
+This is the amount of CPU time spent executing your program's code in user space.
+Here:
+0.001 seconds = 1 millisecond
+For example, calculations, loops, string operations, etc. generally contribute to user CPU time.
+3. sys
+sys     0m0.004s
+This is the amount of CPU time the program spent in the Linux kernel on its behalf.
+For example, operations involving system calls such as:
+read
+write
+open
+close
+can contribute to sys time.
+Here:
+0.004 seconds = 4 milliseconds
+Will it remain the same?
+No. It can change every time you run the program.
+This happens because your computer is doing other things at the same time, and factors such as CPU scheduling, cache state, disk/terminal I/O, VM overhead, and system load can affect timing.
+For your Ubuntu VirtualBox
+Since you're running Ubuntu inside VirtualBox, small variations are especially normal because the VM is sharing your physical CPU/resources with the host system.
