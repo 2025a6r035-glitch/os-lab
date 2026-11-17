@@ -1,0 +1,235 @@
+Experiment 10: Observing Virtual Memory Addresses in C
+Model Institute of Engineering & Technology (Autonomous) | Course: COM-312 Operating System Lab
+A comprehensive laboratory technical manual investigating the architecture of Process Virtual Address Spaces, pointer semantics in the C programming language, the impact of Address Space Layout Randomization (ASLR), and the hardware Memory Management Unit (MMU) mechanisms that prevent physical memory collisions across concurrent processes.
+1. Aim & Objectives
+Aim:To write, compile, and execute a C program that prints the memory address of a local variable inside an infinite loop (while(1)), run 3 to 4 concurrent process instances simultaneously in the background, and analyze the resulting addresses under active and disabled Address Space Layout Randomization (ASLR).
+The key pedagogical objectives of this laboratory experiment are:
+• Objective 1: Demystify C Pointers: Prove that memory addresses printed by C programs are virtual addresses assigned by the operating system kernel, rather than raw physical DRAM chips.
+• Objective 2: Process Concurrency: Spawn multiple independent processes concurrently using the shell background operator (&) and monitor active execution states using pgrep.
+• Objective 3: ASLR Exploration: Analyze modern kernel security defenses by observing how Address Space Layout Randomization introduces entropy into stack frame base addresses.
+• Objective 4: Static Address Reproduction: Disable ASLR using setarch $(uname -m) -R and observe 100% identical virtual pointer values across completely independent running processes.
+• Objective 5: Hardware MMU & Page Tables: Master the architectural mechanism by which the CPU Memory Management Unit (MMU) and per-process page tables map identical virtual addresses to isolated physical DRAM frames.
+2. Theoretical Foundation & Core Concepts
+2.1 What is a Virtual Address Space?
+In modern multiprogrammed operating systems like Linux, user applications do not access physical RAM directly. Instead, every process is provided with an isolated, contiguous abstraction called the Virtual Address Space. For a 64-bit architecture (x86_64), each process perceives a vast address space spanning up to 2^48 bytes (256 Terabytes of user-space virtual memory). This virtual address space contains dedicated segments for program code (.text), initialized data (.data), uninitialized data (.bss), dynamic heap memory, shared libraries (.so), and the execution stack.
+Because this address space is purely virtual, two completely unrelated processes can allocate variables at the exact same numeric virtual memory address without interfering with each other in any way. The operating system kernel enforces strict memory isolation boundaries between processes.
+2.2 Virtual Addresses vs. Physical DRAM Addresses
+A pointer in C (such as &var) stores a virtual memory address. When the program executes a memory read or write instruction (e.g. mov [rax], 42), the CPU does not send that address straight to the memory bus. Instead, the CPU's internal Memory Management Unit (MMU) intercepts the virtual address, traverses the active process's Page Table hierarchy, and translates the Virtual Page Number (VPN) into a Physical Frame Number (PFN) in real DRAM.
+Core Architectural Rule: Under no circumstances does standard user-space C code ever expose or manipulate raw physical RAM addresses. Pointers in Linux C programs are always virtual memory abstractions managed by the kernel and MMU.
+
+
+2.3 Address Space Layout Randomization (ASLR)
+Address Space Layout Randomization (ASLR) is an operating system security feature designed to prevent memory corruption and code-injection exploits, such as Return-to-libc and Stack Buffer Overflow attacks. If the memory addresses of stack variables, functions, and libraries were static and predictable, an attacker could construct malicious input that reliably redirects execution flow to a known memory payload.
+With ASLR enabled (the default state in all modern Linux distributions), the kernel randomizes the starting base address of the stack, heap, and shared memory mappings each time a program is launched. Consequently, consecutive executions of the same program display varying middle address bits, even though they remain inside the high user-space virtual range (0x7ff...).
+3. C Program Source Code (virtual_addr.c)
+The experiment utilizes a concise C program designed to inspect the virtual address of a stack variable and hold the process active indefinitely in RAM:
+/*
+ * Filename: virtual_addr.c
+ * Description: Demonstrating process virtual address space isolation in Linux.
+ */
+
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    // Allocate an integer variable on the process stack frame
+    int var = 42;
+
+    // Print the Process ID (PID) and the hexadecimal address of 'var'
+    printf("PID: %d | Address: %p\n", getpid(), (void*)&var);
+    fflush(stdout);
+
+    // Infinite loop keeps the process active so memory remains allocated
+    while (1) {
+        sleep(1); // Yield CPU cycles each second to avoid 100% core usage
+    }
+
+    return 0;
+}
+
+
+4. Step-by-Step Execution Procedure
+Step 1: Compiling the C Program
+Compile the source code using the standard GNU C Compiler (GCC):
+$ gcc virtual_addr.c -o virtual_addr
+
+
+Step 2: Spawning 4 Concurrent Background Instances (ASLR Active)
+Run four parallel instances of the compiled executable in the background using the shell & operator:
+$ ./virtual_addr &
+$ ./virtual_addr &
+$ ./virtual_addr &
+$ ./virtual_addr &
+
+
+Terminal Output:Observed Terminal Output (ASLR Active):
+PID: 5101 | Address: 0x7ffd8a3e41ac
+PID: 5102 | Address: 0x7ffc1b9028dc
+PID: 5103 | Address: 0x7ffe44d1953c
+PID: 5104 | Address: 0x7ffdf012b76c
+
+
+Step 3: Verifying Active Background Processes
+Confirm that all four process instances are actively executing in memory using pgrep:
+$ pgrep -a virtual_addr
+5101 ./virtual_addr
+5102 ./virtual_addr
+5103 ./virtual_addr
+5104 ./virtual_addr
+
+
+All four processes are active concurrently, each sleeping for 1 second between iterations to avoid CPU saturation.
+Step 4: Terminating the ASLR-Enabled Instances
+Clean up the background processes before proceeding to the static address test:
+$ killall virtual_addr
+
+
+Step 5: Compiling and Executing with ASLR Disabled
+To observe static virtual address allocation, recompile without Position Independent Executable (-no-pie) and invoke each instance under setarch $(uname -m) -R:
+# Compile without position-independent executable flags
+$ gcc -no-pie virtual_addr.c -o virtual_addr_fixed
+
+# Execute 4 concurrent instances with ASLR disabled:
+$ setarch $(uname -m) -R ./virtual_addr_fixed &
+$ setarch $(uname -m) -R ./virtual_addr_fixed &
+$ setarch $(uname -m) -R ./virtual_addr_fixed &
+$ setarch $(uname -m) -R ./virtual_addr_fixed &
+
+
+Terminal Output:Observed Terminal Output (ASLR Disabled):
+PID: 5210 | Address: 0x7fffffffde4c
+PID: 5211 | Address: 0x7fffffffde4c
+PID: 5212 | Address: 0x7fffffffde4c
+PID: 5213 | Address: 0x7fffffffde4c
+
+
+Key Empirical Observation: When ASLR is disabled, all four independent, concurrent processes print the 100% exact same hexadecimal virtual address (0x7fffffffde4c). Despite identical pointer values, they execute in complete isolation without memory corruption.
+
+
+Step 6: Final Process Cleanup
+Terminate the background instances cleanly:
+$ killall virtual_addr_fixed
+
+
+5. Line-by-Line Code Breakdown
+The following table details the architectural and operating system purpose of each statement in virtual_addr.c:
+Code Statement
+Operating System Purpose & Mechanism
+#include <stdio.h>
+Provides standard I/O library declarations, specifically printf() and fflush().
+#include <unistd.h>
+Provides Unix standard system call interfaces, specifically getpid() and sleep().
+int var = 42;
+Allocates an automatic integer variable within the active process's stack frame segment.
+(void*)&var
+Extracts the virtual memory pointer of 'var' and casts it to void* for strict ISO C printf (%p) compliance.
+getpid()
+Queries the Linux kernel to retrieve the unique Process Identifier (PID) of the current execution context.
+printf("PID: %d | Address: %p\n", ...)
+Outputs the PID and formatted hexadecimal virtual memory address to the stdout stream.
+fflush(stdout);
+Flushes standard output stream immediately, ensuring logs appear before process enters the sleep cycle.
+while (1)
+Establishes an infinite execution loop, ensuring the process remains resident and active in system RAM.
+sleep(1);
+Suspends thread execution for 1 second each cycle, putting process into State S (Interruptible Sleep) to yield CPU.
+return 0;
+Standard program exit code (unreachable during while(1), but included for ISO C syntactic correctness).
+
+
+6. In-Depth Observation & Empirical Analysis
+6.1 Analysis of ASLR Active Execution (Observation A)
+Under standard Linux kernel execution, the printed addresses across the four concurrent processes were:
+• PID 5101: 0x7ffd8a3e41ac
+• PID 5102: 0x7ffc1b9028dc
+• PID 5103: 0x7ffe44d1953c
+• PID 5104: 0x7ffdf012b76c
+Structural Properties:Notice two crucial structural properties in these addresses:
+• 1. High-Order Consistency: High-Order Bits (0x7ff...): All four pointers begin with 0x7ff, confirming that all four variables reside in user-space stack memory near the top of the 48-bit canonical virtual address range.
+• 2. Stack Entropy: Intermediate Randomization: The middle hexadecimal characters (d8a, 1b9, e44, df0) vary between executions. The Linux kernel randomizes the stack base page offset upon execve(), ensuring attackers cannot predict pointer locations.
+6.2 Analysis of ASLR Disabled Execution (Observation B)
+When ASLR was disabled via setarch $(uname -m) -R, the output across all four live processes changed dramatically:
+• PID 5210: 0x7fffffffde4c
+• PID 5211: 0x7fffffffde4c
+• PID 5212: 0x7fffffffde4c
+• PID 5213: 0x7fffffffde4c
+Because randomization was disabled and all four processes were built from identical binary ELF headers with identical environment sizes, each process initialized its stack at the exact same virtual offset: 0x7fffffffde4c. This proves beyond doubt that C memory addresses are virtual memory, not physical DRAM! If 0x7fffffffde4c were a physical memory cell, Process 2, 3, and 4 would have overwritten Process 1's memory immediately.
+7. The Architectural Mechanism: Why Processes Never Collide
+The reason four simultaneous processes can print and use the exact same virtual address (0x7fffffffde4c) without colliding is the dual-layer coordination between the Linux Kernel and the CPU Hardware Memory Management Unit (MMU):
+7.1 Per-Process Page Table Isolation
+The operating system maintains a completely separate, dedicated Page Table hierarchy (PGD, P4D, PUD, PMD, PTE on x86_64) for every active process. When Process 5210 accesses 0x7fffffffde4c, the MMU consults Page Table 5210. When Process 5211 accesses 0x7fffffffde4c, the MMU consults Page Table 5211.
+7.2 The Hardware CR3 Register
+When the Linux CPU scheduler performs a context switch from PID 5210 to PID 5211, it writes the physical base address of PID 5211's Page Directory into the CPU's CR3 control register. In a few clock cycles, the CPU's entire address translation world switches over. The identical virtual address points to completely different physical hardware:
+Process 1 [PID 5210]: Virtual 0x7fffffffde4c  ==>  [Page Table 5210]  ==>  Physical DRAM Frame 0x0A2B000
+Process 2 [PID 5211]: Virtual 0x7fffffffde4c  ==>  [Page Table 5211]  ==>  Physical DRAM Frame 0x1F4C000
+Process 3 [PID 5212]: Virtual 0x7fffffffde4c  ==>  [Page Table 5212]  ==>  Physical DRAM Frame 0x2E8D000
+Process 4 [PID 5213]: Virtual 0x7fffffffde4c  ==>  [Page Table 5213]  ==>  Physical DRAM Frame 0x3A01000
+
+
+7.3 Complete Hardware Protection
+Each physical DRAM frame is mapped exclusively into one process's address space. Process 5210 cannot read or modify Physical Frame 0x1F4C000 because that physical page simply does not exist inside Process 5210's page table. Any unauthorized memory access results in a hardware-generated Page Fault (Segmentation Fault, SIGSEGV).
+8. Quick Summary for the Whiteboard
+• 1. Virtual != Physical: Pointers in C are Virtual Memory Addresses: They do not represent physical hardware memory pins or DRAM chip addresses.
+• 2. ASLR Role: ASLR is an OS Security Defense: It randomizes stack and heap base addresses to protect against buffer overflow exploits.
+• 3. Disabling ASLR: setarch $(uname -m) -R disables ASLR: It produces static, predictable virtual memory layouts for testing and debugging.
+• 4. Memory Protection: The Hardware MMU translates addresses on the fly: Per-process page tables guarantee complete isolation, even when virtual addresses are 100% identical.
+9. Observation Table
+The following matrix summarizes the empirical observations recorded during the laboratory session:
+Instance
+ASLR Mode
+Process PID
+Printed Virtual Address
+Physical DRAM Allocation
+Memory Collision
+Process 1
+Active (Default)
+5101
+0x7ffd8a3e41ac
+DRAM Frame A
+None (Protected)
+Process 2
+Active (Default)
+5102
+0x7ffc1b9028dc
+DRAM Frame B
+None (Protected)
+Process 3
+Active (Default)
+5103
+0x7ffe44d1953c
+DRAM Frame C
+None (Protected)
+Process 4
+Active (Default)
+5104
+0x7ffdf012b76c
+DRAM Frame D
+None (Protected)
+Process 1
+Disabled (-R)
+5210
+0x7fffffffde4c
+DRAM Frame W
+None (Protected)
+Process 2
+Disabled (-R)
+5211
+0x7fffffffde4c
+DRAM Frame X
+None (Protected)
+Process 3
+Disabled (-R)
+5212
+0x7fffffffde4c
+DRAM Frame Y
+None (Protected)
+Process 4
+Disabled (-R)
+5213
+0x7fffffffde4c
+DRAM Frame Z
+None (Protected)
+
+
+10. Result
+The C program virtual_addr.c was successfully developed, compiled, and executed across multiple concurrent background instances under Linux. The experimental results conclusively demonstrated that C pointers represent virtual memory addresses rather than physical memory cells. When ASLR is active, the Linux kernel introduces randomized stack offsets to protect against memory exploits; when ASLR is disabled, identical virtual pointer values (0x7fffffffde4c) are reproduced across all concurrent processes. The experiment successfully verified that the operating system kernel and hardware Memory Management Unit (MMU) enforce complete physical memory isolation across concurrent processes through per-process page table translation.
