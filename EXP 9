@@ -1,0 +1,143 @@
+Experiment 9: Process Creation and Termination Using C
+Model Institute of Engineering & Technology (Autonomous) | Course: COM-312 Operating System Lab
+1. Aim & Objectives
+Aim: To write and execute a C program that creates a child process, waits for its termination, and displays its Process ID (PID) under Linux.
+Step 1: Explain what a Process ID (PID) is and how to retrieve it using getpid().
+Step 2: Demonstrate process cloning using fork() and observe dual return values.
+Step 3: Synchronize parent and child processes using wait(NULL) and display the terminated child's PID.
+2. Step 1: What is a Process ID (PID)?
+Whenever any C program runs, the operating system assigns it a unique identification number—similar to a student roll number. This is called the Process ID (PID). We use the getpid() function from <unistd.h> to check it.
+Source Code: Filename: step1_pid.c
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    // getpid() returns the PID of the currently running process
+    printf("I am a simple process. My PID is: %d\n", getpid());
+    return 0;
+}
+
+
+Key Teaching Takeaway: One running program equals one active process with one unique PID.
+Compilation and Output:
+$ gcc step1_pid.c -o step1_pid
+$ ./step1_pid
+I am a simple process. My PID is: 3412
+
+
+3. Step 2: Creating a Child Process with fork()
+Calling fork() clones the running program into two separate, concurrent processes:
+1. The Child process, where fork() returns 0.
+2. The Parent process, where fork() returns the child's positive PID.
+Source Code: Filename: step2_fork.c
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    pid_t p = fork();
+
+    // From this point onward, both processes execute the same code
+    if (p == 0) {
+        // Only the child executes this branch
+        printf("I am the CHILD process! My own PID: %d\n", getpid());
+    } else {
+        // Only the parent executes this branch
+        printf("I am the PARENT process! fork() gave me child's PID: %d\n", p);
+    }
+
+    return 0;
+}
+
+
+Observation for Students: Both processes run independently. Sometimes the parent finishes first, and sometimes the child finishes first, leading to interleaved terminal output.
+Compilation and Output:
+$ gcc step2_fork.c -o step2_fork
+$ ./step2_fork
+I am the PARENT process! fork() gave me child's PID: 3450
+I am the CHILD process! My own PID: 3450
+
+
+4. Step 3: Synchronizing with wait() to Display the Child's PID
+To ensure orderly execution, we introduce wait() from <sys/wait.h>. The parent process halts its execution until the child finishes working.
+Calling wait(NULL) serves two crucial purposes:
+1. It pauses (blocks) the parent process until the child exits.
+2. It returns the PID of the child process that just terminated.
+Main Lab Source Code: Filename: process_creation_wait.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main() {
+    pid_t p = fork();
+
+    if (p == 0) {
+        // --- CHILD BRANCH ---
+        printf("[Child] Work started. My PID: %d\n", getpid());
+        sleep(2); // Pause so students can clearly observe the parent waiting
+        printf("[Child] Work finished! Exiting now.\n");
+        exit(0);
+    } 
+    else {
+        // --- PARENT BRANCH ---
+        printf("[Parent] Child started. Now waiting for it to finish...\n");
+
+        // wait(NULL) halts the parent and returns the terminated child's PID
+        pid_t terminated_pid = wait(NULL);
+
+        printf("[Parent] Child with PID %d has terminated!\n", terminated_pid);
+    }
+
+    return 0;
+}
+
+
+Compilation and Output:
+$ gcc process_creation_wait.c -o exp9
+$ ./exp9
+[Parent] Child started. Now waiting for it to finish...
+[Child] Work started. My PID: 3450
+[Child] Work finished! Exiting now.
+[Parent] Child with PID 3450 has terminated!
+
+
+5. Line-by-Line Code Breakdown
+Code Statement
+Operating System Explanation
+pid_t p = fork();
+Clones calling process into two execution paths. Returns 0 to child and child's PID to parent.
+if (p == 0)
+Evaluates true only inside the child process. The child enters this block.
+printf("...PID: %d", getpid());
+getpid() queries the kernel and prints the process's own unique PID.
+sleep(2);
+Pauses child for 2 seconds so students clearly observe the parent actively waiting.
+exit(0);
+Terminates the child cleanly so it does not execute parent statements.
+else { ... }
+Evaluates true inside the parent process, where p contains the positive child PID.
+pid_t term_pid = wait(NULL);
+Blocks parent until child exits, then harvests and returns the terminated child's PID.
+
+
+6. Quick Summary for the Whiteboard
+fork(): Clones the calling process. Returns 0 to the child and the child's PID to the parent.
+getpid(): Retrieves the current process's own PID.
+wait(NULL): Pauses the parent and returns the PID of the child once it exits.
+7. Observation Table
+Execution Step
+Observed Process PID
+Return Value Recorded
+Step 1 (getpid)
+3412 (Single Process)
+getpid() = 3412
+Step 2 (fork)
+Parent: 3449 | Child: 3450
+fork() = 0 (child), 3450 (parent)
+Step 3 (wait)
+Parent: 3449 | Child: 3450
+wait(NULL) = 3450 (terminated child)
+
+
+8. Result
+The three step-by-step C programs demonstrating Process ID inspection (getpid), process creation (fork), and parent-child synchronization with child PID display (wait) were successfully written, compiled, and executed. The experiment confirmed how Linux identifies processes, duplicates execution contexts, and coordinates orderly process termination.
