@@ -1,0 +1,197 @@
+Experiment 7: CPU-Bound vs I/O-Bound C Programs Using top
+A comprehensive technical manual analyzing CPU scheduling dynamics, comparing CPU-bound and I/O-bound process behaviors in C, background execution via job control, and process state monitoring using top.
+Experiment 7: CPU-Bound and I/O-Bound C Programs Using top
+1. Aim
+To write and run a CPU-bound C program and an I/O-bound C program, and to compare their CPU utilization, process states and accumulated CPU time using the top command.
+2. Program 1: I/O-Bound Program
+Filename: io_bound.c
+#include <stdio.h>
+#include <unistd.h>
+
+int main()
+{
+    FILE *fp;
+
+    printf("Starting I/O task...\n");
+
+    while (1)
+    {
+        fp = fopen("dummy.txt", "w");
+
+        if (fp != NULL)
+        {
+            fprintf(fp, "Writing disk data\n");
+            fclose(fp);
+
+            printf("File operation done\n");
+        }
+
+        sleep(1);
+    }
+
+    return 0;
+}
+
+
+2.1 Line-by-Line Explanation
+Code
+Explanation
+#include <stdio.h>
+Provides standard input/output and file-handling functions such as printf(), fopen(), fprintf() and fclose().
+#include <unistd.h>
+Provides the sleep() function on Linux and other POSIX systems.
+int main()
+Program execution begins from the main() function.
+FILE *fp;
+Declares a file pointer named fp that holds the file stream returned by fopen().
+printf("Starting I/O task...\n");
+Displays a message indicating that the I/O task has started.
+while (1)
+Creates an infinite loop. The file operation repeats until the process is terminated.
+fp = fopen("dummy.txt", "w");
+Opens dummy.txt in write mode. If the file does not exist, it is created. If it exists, its previous contents are truncated. If the operation fails, fopen() returns NULL.
+if (fp != NULL)
+Checks that the file was opened successfully before writing to it.
+fprintf(fp, "Writing disk data\n");
+Writes the text to the file stream. The data may initially be buffered in memory.
+fclose(fp);
+Closes the file and flushes the C library's buffered output. This does not guarantee that the data has been physically written to the storage device when the function returns.
+printf("File operation done\n");
+Displays a confirmation message after the file has been closed.
+sleep(1);
+Suspends the process for approximately one second. During this time the process does not actively consume CPU time.
+return 0;
+Indicates successful termination. It is normally unreachable because the loop runs indefinitely.
+
+
+2.2 Expected Output
+Starting I/O task...
+File operation done
+File operation done
+File operation done
+...
+
+
+After the initial startup message, the confirmation message appears approximately once per second. Actual timing can vary.
+3. Program 2: CPU-Bound Program
+Filename: cpu_bound.c
+#include <stdio.h>
+
+int main()
+{
+    long long counter = 0;
+
+    while (1)
+    {
+        counter++;
+
+        if (counter % 100000000 == 0)
+        {
+            printf("CPU task running: %lld\n", counter);
+        }
+    }
+
+    return 0;
+}
+
+
+3.1 Line-by-Line Explanation
+Code
+Explanation
+#include <stdio.h>
+Includes the standard input/output library, which provides printf().
+int main()
+Program execution starts here.
+long long counter = 0;
+Declares a variable named counter and initializes it to zero. The long long type can hold a very large integer.
+while (1)
+Starts an infinite loop that continues until the process is terminated.
+counter++;
+Increments the counter by one on every iteration (1, 2, 3, and so on).
+if (counter % 100000000 == 0)
+The % operator gives the remainder. The condition is true whenever the counter is exactly divisible by 100,000,000 (for example 100000000, 200000000, 300000000).
+printf("CPU task running: %lld\n", counter);
+Prints the current counter value. The %lld format specifier is used for a long long integer.
+return 0;
+Indicates successful termination, but the infinite loop normally prevents this statement from being reached.
+
+
+3.2 Expected Output
+CPU task running: 100000000
+CPU task running: 200000000
+CPU task running: 300000000
+...
+
+
+Output appears each time the counter reaches another multiple of 100 million. Printing uses a small amount of CPU time, but most of the work is repeated counting.
+4. Compiling and Running the Programs
+Step 1: Compile
+gcc io_bound.c -o io_bound
+gcc cpu_bound.c -o cpu_bound
+
+
+Step 2: Run both programs in the background
+./io_bound &
+./cpu_bound &
+
+
+The & symbol runs each program in the background.
+Step 3: Find the PIDs
+pgrep -af 'io_bound|cpu_bound'
+
+
+Example output:
+2451 ./io_bound
+2452 ./cpu_bound
+
+
+Use your actual PIDs in the commands that follow.
+5. Observing CPU Share Using top
+Purpose
+Command
+Notes
+Display all processes
+top
+Press P to sort processes by CPU utilization.
+Monitor only these two processes
+top -p 2451,2452
+Replace the example PIDs with the actual process IDs.
+Refresh every second
+top -d 1
+Updates the display once per second.
+Collect five snapshots
+top -b -n 5 -d 1
+Useful for recording readings in the observation table.
+View individual CPU cores
+top, then press 1
+Shows utilization of each logical CPU.
+
+
+Expected observations
+cpu_bound should generally show a high %CPU.
+io_bound should generally show a low %CPU, because it sleeps for one second after each file operation.
+The CPU-bound process generally accumulates CPU time faster.
+Note: A single-threaded process may use approximately 100% of one logical CPU, depending on system load and top display settings. The precise value can vary.
+
+
+6. Observation Table
+Record your actual readings.
+Parameter
+CPU-Bound
+I/O-Bound
+CPU utilization (%CPU)
+Generally high
+Generally low
+Process state (S)
+Usually R when observed
+Often S during sleep
+CPU time (TIME+)
+Increases rapidly
+Increases more slowly
+Main activity
+Repeated counter increments
+File writing and sleeping
+
+
+7. Result
+Both C programs were executed successfully. The top command was used to compare CPU utilization, process states and accumulated CPU time. The CPU-bound program generally consumed more CPU time, whereas the I/O-bound program used less CPU time because it spent much of its time sleeping.
