@@ -1,0 +1,624 @@
+Experiment 3: Bash Scripting, Conditionals & Loops
+A comprehensive technical manual detailing shell scripting foundations, interpreter directives, command-line parameter bindings, conditional evaluation with test operators, looping algorithms, command substitution, and automated file-system manipulation in Linux.
+Experiment 3
+Bash Scripting: Core Concepts, Conditionals, and Loops
+Part 1 — Core Concepts & Theory
+1. What is a Script?
+A shell script is a text file containing a series of commands that are executed by a shell, such as Bash.
+Yes, while all shells share the same core purpose—taking commands, executing them, and returning output—they differ significantly in syntax compatibility, interactive user experience, and performance.
+Dimension
+Bash
+Zsh
+Fish
+Dash
+Standards Compliance
+POSIX + GNU extensions
+POSIX + extensions (superset of Bash)
+Non-POSIX (custom syntax)
+Strictly POSIX
+Array Indexing
+0-indexed (${arr[0]})
+1-indexed ($arr[1])
+1-indexed ($arr[1])
+No array support
+Out-of-the-Box Features
+Basic tab completion
+Rich completion via modules
+Autosuggestions, syntax colors, web config
+Barebones (execution only)
+Configuration Files
+~/.bashrc, ~/.bash_profile
+~/.zshrc
+~/.config/fish/config.fish
+~/.profile
+Execution Speed
+Moderate
+Moderate / heavy with plugins
+Fast (interactive)
+Extremely fast & lightweight
+
+
+Scripts are useful for automating repetitive tasks. Instead of entering several commands manually in the terminal, you can save them in a file and execute them together.
+A script can be thought of as a small program made from shell commands.
+Example
+#!/bin/bash
+
+echo "Hello, Linux!"
+date
+pwd
+
+
+
+
+When this script is executed, the commands run in sequence.
+2. What are Command-Line Arguments?
+Command-line arguments are values supplied to a program or script when it is started. They allow the same script to work with different inputs without changing its code.
+General Syntax
+command [argument1] [argument2] ...
+
+
+Example
+./myscript.sh hello.txt notes folder1
+
+
+In this command:
+./myscript.sh is the script being executed.
+
+
+hello.txt is the first input.
+notes is the second input.
+folder1 is the third input.
+Bash makes these values available through positional parameters.
+3. Positional Parameters in Bash
+Positional parameters are special variables used to access information provided to a script.
+Parameter
+Purpose
+$0
+Name or path used to invoke the script
+$1
+First command-line argument
+$2
+Second command-line argument
+$3
+Third command-line argument
+$#
+Total number of arguments
+$@
+All supplied arguments as separate items
+
+
+Example
+If the script is executed as:
+./myscript.sh file.txt backup documents
+
+
+Then:
+$0 → ./myscript.sh
+$1 → file.txt
+$2 → backup
+$3 → documents
+$# → 3
+$@ → file.txt backup documents
+$@ is particularly useful when processing several arguments, such as inside a loop.
+4. Conditional Testing
+Bash provides test and [ for checking conditions. They are commonly used with if statements.
+Common File Tests
+Test
+Meaning
+-f path
+Checks whether the path exists and refers to a regular file.
+-d path
+Checks whether the path exists and refers to a directory.
+
+
+Numeric Comparison
+-ne means "not equal" and is used when comparing numbers.
+Example
+if [ "$#" -ne 2 ]; then
+  echo "Two arguments are required."
+fi
+
+
+
+
+Integer Comparison Operators
+Used specifically for numbers within [ or test:
+-eq (Equal): [ "$a" -eq "$b" ]
+-ne (Not equal): [ "$a" -ne "$b" ]
+-lt (Less than): [ "$a" -lt "$b" ]
+-le (Less than or equal): [ "$a" -le "$b" ]
+-gt (Greater than): [ "$a" -gt "$b" ]
+-ge (Greater than or equal): [ "$a" -ge "$b" ]
+File Attribute Operators
+Used for checking file types, states, and permissions:
+-e (Exists): Returns true if the file or directory exists.
+-f (Regular file): Returns true if the path exists and is a file.
+-d (Directory): Returns true if the path exists and is a directory.
+-s (Not empty): Returns true if the file exists and has a size greater than zero.
+-r (Readable): Returns true if read permission is granted.
+-w (Writable): Returns true if write permission is granted.
+-x (Executable): Returns true if execute permission is granted.
+5. Command Substitution
+Command substitution/Variable assignment allows the output produced by one command to be captured and used elsewhere.
+Syntax
+$(command)
+
+
+Example
+current_date=$(date)
+echo "$current_date"
+
+
+
+
+Here, Bash executes date, takes its output, and stores that output in current_date.
+This is useful when the result of one command needs to become the input for another command or be stored in a variable.
+6. Filename Manipulation
+Shell commands can be used to modify filenames and rename files.
+Converting Text to Uppercase
+The tr command can translate lowercase characters into uppercase characters:
+tr '[:lower:]' '[:upper:]'
+
+
+For example:
+echo "hello world" | tr '[:lower:]' '[:upper:]'
+
+
+Output: HELLO WORLD
+Renaming or Moving Files
+The mv command is used to rename a file or move it to another location.
+mv "$old" "$new"
+
+
+For example:
+mv old.txt new.txt
+
+
+This changes the filename from old.txt to new.txt.
+Part 2 — Conditional Statements and Loops in Bash
+Below is a clean student-note format covering the syntax, a complete working example, a line-by-line explanation, and how to run it for if, if-else, and for.
+1. if Statement
+The if statement is used when a script needs to check a condition and execute a command only when that condition is true.
+Syntax
+if [ condition ]
+then
+  commands
+fi
+
+
+
+
+Complete Working Example
+#!/bin/bash
+if [ -f "notes.txt" ]
+then
+  echo "notes.txt is a regular file."
+fi
+
+
+
+
+Line-by-Line Explanation
+Line
+Explanation
+#!/bin/bash
+Specifies that the script should be executed using the Bash shell.
+if [ -f "notes.txt" ]
+Starts the if statement. -f checks whether notes.txt is a regular file. [ ... ] performs the condition test.
+then
+Indicates that the following command should execute if the condition is true.
+echo "notes.txt is a regular file."
+Displays a message if notes.txt is a regular file.
+fi
+Marks the end of the if statement. fi is if written backwards.
+
+
+How to Run
+Create the file:
+nano check.sh
+
+
+Create a test file:
+touch notes.txt
+
+
+Give execute permission:
+chmod +x check.sh
+
+
+Run:
+./check.sh
+
+Output:
+notes.txt is a regular file.
+
+
+
+
+2. if-else Statement
+The if-else statement is used when there are two possible outcomes.
+If the condition is true → execute the then block.
+If the condition is false → execute the else block.
+Syntax
+if [ condition ]
+then
+  commands
+else
+  commands
+fi
+
+
+
+
+Complete Working Example
+#!/bin/bash
+if [ -f "notes.txt" ]
+then
+  echo "notes.txt is a regular file."
+else
+  echo "notes.txt is not a regular file."
+fi
+
+
+
+
+Line-by-Line Explanation
+Line
+Explanation
+#!/bin/bash
+Specifies Bash as the interpreter.
+if [ -f "notes.txt" ]
+Checks whether notes.txt is a regular file. -f returns true if the file exists and is a regular file.
+then
+Starts the commands that will execute when the condition is true.
+echo "notes.txt is a regular file."
+Prints the message when notes.txt is a regular file.
+else
+Runs when the if condition is false.
+echo "notes.txt is not a regular file."
+Displays a message when notes.txt is not a regular file.
+fi
+Ends the if-else statement.
+
+
+How to Test It
+If the file exists:
+touch notes.txt
+./check.sh
+
+Output:
+notes.txt is a regular file.
+
+
+
+
+Remove the file, then run the script again:
+rm notes.txt
+./check.sh
+
+Output:
+notes.txt is not a regular file.
+
+
+
+
+
+3. for Loop
+A for loop is used to repeat a set of commands for multiple values.
+Instead of writing the same command several times, a loop performs the operation automatically.
+Syntax
+for variable in values
+do
+  commands
+done
+
+
+
+
+while [ condition]
+do
+    # commands to execute
+done
+Complete Working Example
+#!/bin/bash
+while (( count <= 5 ))
+do
+    echo "$count"
+    ((count++))
+done
+
+#!/bin/bash
+for name in Ali Rahul Aman
+do
+  echo "Hello $name"
+done
+
+
+
+
+for item in $(cat fruits.txt)
+do
+    echo "Fruit: $item"
+done
+#!/bin/bash
+for i in {1..5}
+do
+    echo "Count: $i"
+done
+
+
+(You can also set step increments, e.g., {1..10..2} for odd numbers 1 through 9).
+#!/bin/bash
+
+
+for (( i=1; i<=5; i++ ))
+do
+    echo "Number: $i"
+done
+#!/bin/bash
+for file in *.sh
+do
+    echo "Found script: $file"
+done
+
+a=10
+b=3
+
+echo "Addition:       $((a + b))"    # 13
+echo "Subtraction:    $((a - b))"    # 7
+echo "Multiplication: $((a * b))"    # 30
+echo "Division:       $((a / b))"    # 3 (integer division, drops decimals)
+echo "Modulus:        $((a % b))"    # 1 (remainder)
+echo "Exponentiation: $((a ** b))"   # 1000 (10^3)
+
+
+
+
+
+
+
+Line-by-Line Explanation
+Line
+Explanation
+#!/bin/bash
+Specifies Bash as the interpreter.
+for name in Ali Rahul Aman
+Starts the for loop. name is the loop variable; Ali, Rahul, and Aman are the values processed. The loop runs three times (name = Ali, Rahul, Aman).
+do
+Marks the beginning of the commands that belong to the loop.
+echo "Hello $name"
+Prints a greeting using the current value of $name. Output during execution: Hello Ali / Hello Rahul / Hello Aman.
+done
+Marks the end of the for loop. Bash goes back to the for statement and takes the next value.
+
+
+How to Run
+Create the script:
+nano greet.sh
+
+
+Give it execute permission:
+chmod +x greet.sh
+
+
+Run it:
+./greet.sh
+
+Output:
+Hello Ali
+Hello Rahul
+Hello Aman
+
+
+
+
+Creating and Running a Shell Script
+Step 1: Create the Script
+Create a new file using nano:
+nano script_name.sh
+
+
+Write the required Bash commands inside the file and save it.
+Step 2: Give Execute Permission
+Before running the script directly, make it executable:
+chmod +x script_name.sh
+
+
+The +x permission allows the file to be executed as a program.
+Step 3: Run the Script
+Execute the script using:
+./script_name.sh
+
+
+If the script requires command-line arguments, provide them after the script name:
+./script_name.sh argument1 argument2
+
+
+For example:
+./script_name.sh hello.txt backup
+
+
+The script can then access these values through $1, $2, and other positional parameters.
+Task 1 — Check if Argument Is a File or Directory
+Script
+#!/bin/bash
+if [ $# -ne 1 ]; then
+  echo "No Argument passed, Try Again with an Argument"
+  exit 1
+fi
+
+target="$1"
+
+if [ -f "$target" ]; then
+  echo "$target is a regular file."
+elif [ -d "$target" ]; then
+  echo "$target is a directory."
+elif [ -e "$target" ]; then
+  echo "$target exists, but is neither a regular file nor a directory."
+else
+  echo "Error: $target does not exist."
+fi
+
+
+
+
+Line-by-Line Explanation
+Line
+Explanation
+#!/bin/bash
+The shebang — tells Linux to use the Bash shell (/bin/bash) to execute this script.
+if [ $# -ne 1 ]; then
+Checks whether the user provided exactly one command-line argument. $# is the number of arguments, -ne means "not equal to". Example: running ./checkpath.sh with no arguments makes $# equal 0, so 0 -ne 1 is true.
+echo "No Argument passed, Try Again with an Argument"
+Displays instructions telling the user how to run the script.
+exit 1
+Stops the script immediately. exit terminates the script; 1 indicates it ended because of an error (exit 0 = success, exit 1 = error/failure).
+fi
+Marks the end of the if statement. In Bash, if is closed using fi, which is if written backwards.
+target="$1"
+Stores the first command-line argument in a variable named target. Example: ./checkpath.sh notes.txt sets $1 = notes.txt, so target = notes.txt. The quotes around "$1" help handle paths containing spaces.
+if [ -f "$target" ]; then
+Checks whether target is a regular file. -f returns true if the path is a regular file.
+echo "$target is a regular file."
+Displays a message confirming that the supplied path is a regular file.
+elif [ -d "$target" ]; then
+If the previous condition was false, checks whether the path is a directory. elif means "else if"; -d checks for a directory.
+echo "$target is a directory."
+Displays a message indicating that the supplied path is a directory.
+elif [ -e "$target" ]; then
+If the path is neither a regular file nor a directory, checks whether the path exists in some other form (e.g. device files, sockets, or other special entries) using -e.
+echo "$target exists, but is neither..."
+Displays a message when the path exists but does not satisfy the -f or -d tests.
+else
+Handles the case where none of the previous conditions were true — meaning the specified path does not exist.
+echo "Error: $target does not exist."
+Displays an error message, e.g. "Error: abc.txt does not exist." if abc.txt is missing.
+fi
+Closes the final if/elif/else structure.
+
+
+How to Run Task 1
+chmod +x check_type.sh
+./check_type.sh /etc/passwd
+./check_type.sh /var/log
+
+
+
+
+
+Script — Rename Files to Uppercase
+Script
+#!/bin/bash
+# Loop through all arguments
+for file in "$@"
+do
+  # Convert filename to uppercase and rename
+  mv "$file" "$(echo "$file" | tr '[:lower:]' '[:upper:]')"
+done
+
+
+
+
+Line-by-Line Explanation
+Line 1 — #!/bin/bash
+This is called the shebang.
+It tells Linux to use the Bash shell to execute the script.
+Line 2 — # Loop through all arguments
+This is a comment.
+Comments are ignored by Bash.
+It describes what the following code does.
+Line 3 — for file in "$@"
+This starts a for loop.
+for → starts the loop.
+file → variable that stores one filename at a time.
+"$@" → represents all command-line arguments supplied to the script.
+For example:
+./rename.sh notes.txt report.txt data.txt
+
+
+The loop processes notes.txt, report.txt, and data.txt one by one.
+Line 4 — do
+Marks the beginning of the commands that will be executed for each argument.
+Everything between do and done belongs to the loop.
+Line 5 — # Convert filename to uppercase and rename
+This is another comment.
+It explains that the next command will convert the filename to uppercase and rename it.
+Line 6 — mv "$file" "$(echo "$file" | tr '[:lower:]' '[:upper:]')"
+This is the main command of the script. It uses mv to rename the file.
+Component
+Meaning
+mv
+Moves or renames files. Example: mv old.txt new.txt renames old.txt to new.txt.
+"$file"
+Represents the original filename. If file is notes.txt, then "$file" represents notes.txt.
+$(...)
+Command substitution — executes the command inside the parentheses and uses its output as a value. Here, it generates the new filename.
+echo "$file"
+Displays the current filename, e.g. notes.txt.
+|
+A pipe — sends the output of one command to another. echo "$file" | tr ... takes the filename and sends it to tr.
+tr '[:lower:]' '[:upper:]'
+Converts lowercase characters to uppercase, e.g. notes.txt becomes NOTES.TXT.
+
+
+Put together, $(echo "$file" | tr '[:lower:]' '[:upper:]') produces the new uppercase filename, and the complete command effectively becomes:
+mv "notes.txt" "NOTES.TXT"
+
+
+So the file is renamed.
+Line 7 — done
+Marks the end of the for loop.
+Bash then takes the next command-line argument and repeats the process.
+How to Run the Script
+Step 1: Create the script
+nano rename.sh
+
+
+Enter the script and save it.
+Step 2: Give execute permission
+chmod +x rename.sh
+
+
+Step 3: Create some test files
+touch notes.txt report.txt hello.txt
+
+
+Step 4: Run the script
+./rename.sh notes.txt report.txt hello.txt
+
+The files will be renamed to:
+NOTES.TXT
+REPORT.TXT
+HELLO.TXT
+
+
+
+
+Important Point
+This script changes only the filenames, not the contents of the files.
+For example, notes.txt containing "hello linux" will become NOTES.TXT — but its contents will remain "hello linux".
+Concepts Used
+Code
+Purpose
+#!/bin/bash
+Specifies Bash as the interpreter
+"$@"
+Represents all command-line arguments
+for
+Processes arguments one by one
+file
+Stores the current argument
+mv
+Renames or moves files
+echo
+Outputs the filename
+|
+Sends output to another command
+tr
+Converts lowercase characters to uppercase
+$(...)
+Performs command substitution
+do ... done
+Defines the body of the loop
+
+
